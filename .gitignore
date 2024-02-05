@@ -1,0 +1,6 @@
+build
+.vscode
+.cache
+*.kdev4
+*.user
+*.TMP

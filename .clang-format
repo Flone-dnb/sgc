@@ -1,0 +1,17 @@
+﻿---
+BasedOnStyle: LLVM
+AccessModifierOffset: -4
+IndentWidth: 4
+AlignAfterOpenBracket: AlwaysBreak
+BinPackArguments: false
+BinPackParameters: false
+ColumnLimit: 110
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: All
+SortIncludes: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+SpaceAroundPointerQualifiers: Default
+PointerAlignment: Left
+FixNamespaceComments: false  # does not work as expected when namespace uses reflection
+...
