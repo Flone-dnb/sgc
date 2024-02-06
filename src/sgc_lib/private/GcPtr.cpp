@@ -17,9 +17,16 @@ namespace sgc {
             "failed to set the specified raw pointer to a GC pointer because the specified object "
             "(in the raw pointer) was not previously created from `makeGc` call";
 
-        // Make sure we are not running garbage collection because we will look for existing allocations.
+        // Make sure we are not running a garbage collection.
         auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationControlledData;
         std::scoped_lock guard(mtxAllocationsData.first);
+
+        // Check if the specified pointer is valid.
+        if (pUserObject == nullptr) {
+            // Just clear internal pointer (keep the GC mutex locked while changing the pointer).
+            pAllocationInfo = nullptr;
+            return;
+        }
 
         // Prepare addresses.
         const auto iTargetObjectAddress = reinterpret_cast<uintptr_t>(pUserObject);
@@ -58,5 +65,14 @@ namespace sgc {
     }
 
     GcAllocationInfo* GcPtrBase::getAllocationInfo() const { return pAllocationInfo; }
+
+    void* GcPtrBase::getUserObject() const {
+        // Make sure allocation info is valid.
+        if (pAllocationInfo == nullptr) {
+            return nullptr;
+        }
+
+        return pAllocationInfo + static_cast<uintptr_t>(sizeof(GcAllocationInfo));
+    }
 
 }

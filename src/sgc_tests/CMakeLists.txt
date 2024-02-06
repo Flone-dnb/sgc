@@ -19,7 +19,7 @@ include(${RELATIVE_CMAKE_HELPERS_PATH}/utils.cmake)
 # Sources.
 set(PROJECT_SOURCES
     src/main.cpp
-    src/tests.cpp
+    src/NodeGraphTests.cpp
     # add your .h/.cpp files here
 )
 

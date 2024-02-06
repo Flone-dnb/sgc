@@ -3,8 +3,15 @@
 #include <crtdbg.h>
 #endif
 
+// Custom.
+#include "GcInfoCallbacks.hpp"
+
 // External.
 #include "catch2/catch_session.hpp"
+
+static inline void gcWarningCallback(const char* pMessage) { throw std::runtime_error(pMessage); }
+
+static inline void gcCriticalErrorCallback(const char* pMessage) { throw std::runtime_error(pMessage); }
 
 int main() {
     // Enable run-time memory check for debug builds (on Windows).
@@ -14,5 +21,9 @@ int main() {
     OutputDebugStringA("Using release build configuration, memory checks are disabled.");
 #endif
 
+    // Set warn/error callbacks.
+    sgc::GcInfoCallbacks::setCallbacks(gcWarningCallback, gcCriticalErrorCallback);
+
+    // Run tests.
     Catch::Session().run();
 }

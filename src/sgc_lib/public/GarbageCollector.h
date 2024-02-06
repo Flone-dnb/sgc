@@ -22,23 +22,6 @@ namespace sgc {
         friend class GcAllocation;
 
     public:
-        GarbageCollector(const GarbageCollector&) = delete;
-        GarbageCollector& operator=(const GarbageCollector&) = delete;
-
-        GarbageCollector(GarbageCollector&&) noexcept = delete;
-        GarbageCollector& operator=(GarbageCollector&&) noexcept = delete;
-
-        /**
-         * Returns garbage collector singleton.
-         *
-         * @return Garbage collector singleton.
-         */
-        static GarbageCollector& get();
-
-        /** Runs garbage collection which might cause some no longer references objects to be destroyed. */
-        void collectGarbage();
-
-    private:
         /**
          * Stores pending changes that occur between garbage collections and that need to be "applied"
          * to the data that GarbageCollector stores.
@@ -61,6 +44,49 @@ namespace sgc {
             std::unordered_set<const GcPtrBase*> newRootNodes;
         };
 
+        GarbageCollector(const GarbageCollector&) = delete;
+        GarbageCollector& operator=(const GarbageCollector&) = delete;
+
+        GarbageCollector(GarbageCollector&&) noexcept = delete;
+        GarbageCollector& operator=(GarbageCollector&&) noexcept = delete;
+
+        /**
+         * Returns garbage collector singleton.
+         *
+         * @return Garbage collector singleton.
+         */
+        static GarbageCollector& get();
+
+        /** Runs garbage collection which might cause some no longer references objects to be destroyed. */
+        void collectGarbage();
+
+        /**
+         * Returns pointer to read-only data of the garbage collector's internal "pending changes" set.
+         *
+         * @warning Do not delete (free) returned pointer or modify the pending changes set.
+         *
+         * @warning Only use with returned mutex.
+         *
+         * @remark Used for automated tests and debugging.
+         *
+         * @return Pending changes to node graph.
+         */
+        std::pair<std::mutex, PendingNodeGraphChanges>* getPendingNodeGraphChanges();
+
+        /**
+         * Returns pointer to read-only data of the garbage collector's internal root node set.
+         *
+         * @warning Do not delete (free) returned pointer or modify the root node set.
+         *
+         * @warning Only use with returned mutex.
+         *
+         * @remark Used for automated tests and debugging.
+         *
+         * @return Root nodes in the node graph.
+         */
+        std::pair<std::recursive_mutex, std::unordered_set<const GcPtrBase*>>* getRootNodes();
+
+    private:
         /** Groups mutex guarded data controlled by GC allocations. */
         struct AllocationControlledData {
             /**

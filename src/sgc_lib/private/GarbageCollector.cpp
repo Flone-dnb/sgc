@@ -18,11 +18,22 @@ namespace sgc {
             // Apply changes from pending set.
         }
 
-        // Lock root nodes and allocations to make sure new allocations won't be created while we are
-        // collecting garbage.
+        // Lock root nodes and allocations to make sure new allocations won't be created
+        // while we are collecting garbage.
+        // Also GcPtr locks allocations when changing its pointer so we guarantee
+        // that no GcPtr will change its pointer while we are in the GC.
         std::scoped_lock guard(mtxRootNodes.first, mtxAllocationControlledData.first);
 
         // run garbage collection
+    }
+
+    std::pair<std::mutex, GarbageCollector::PendingNodeGraphChanges>*
+    GarbageCollector::getPendingNodeGraphChanges() {
+        return &mtxPendingNodeGraphChanges;
+    }
+
+    std::pair<std::recursive_mutex, std::unordered_set<const GcPtrBase*>>* GarbageCollector::getRootNodes() {
+        return &mtxRootNodes;
     }
 
     bool GarbageCollector::onGcPointerConstructed(GcPtrBase* pConstructedPtr) {
