@@ -18,9 +18,9 @@ namespace sgc {
         return pInvokeDestructor;
     }
 
-    bool GcTypeInfo::tryRegisteringSubPtrOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation) {
+    bool GcTypeInfo::tryRegisteringGcPtrFieldOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation) {
         // Self check: make sure sub-pointer offsets are not initialized.
-        if (bAllSubPtrOffsetsInitialized) [[unlikely]] {
+        if (bAllGcPtrFieldOffsetsInitialized) [[unlikely]] {
             GcInfoCallbacks::getWarningCallback()(
                 "GC controlled type received a request to register sub-pointer offset but all offsets are "
                 "already initialized for this type");
@@ -41,14 +41,14 @@ namespace sgc {
         const auto iFullOffset = iPtrAddress - iOwnerAddress;
 
         // Make sure we won't go out of type limit.
-        if (iFullOffset > std::numeric_limits<subptr_offset_t>::max()) [[unlikely]] {
+        if (iFullOffset > std::numeric_limits<gcptr_field_offset_t>::max()) [[unlikely]] {
             GcInfoCallbacks::getCriticalErrorCallback()(
                 "calculated sub-pointer offset exceeds limit of the type used to store offsets");
             throw std::runtime_error("critical error"); // can't continue
         }
 
         // Add offset.
-        vSubPtrOffsets.push_back(static_cast<subptr_offset_t>(iFullOffset));
+        vGcPtrFieldOffsets.push_back(static_cast<gcptr_field_offset_t>(iFullOffset));
 
         // Registered.
         return true;

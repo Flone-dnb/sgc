@@ -10,10 +10,11 @@ namespace sgc {
 
     /** Stores information about a specific GC controlled type. */
     class GcTypeInfo {
-        // Only garbage collector can view if subptr offsets are initialized or not and register new ones.
+        // Only garbage collector can view if GcPtr field offsets are initialized or not and register
+        // new ones.
         friend class GarbageCollector;
 
-        // Allocation marks subptr offsets as initialized after an object of this type has finished its
+        // Allocation marks GcPtr field offsets as initialized after an object of this type has finished its
         // constructor.
         friend class GcAllocation;
 
@@ -22,7 +23,7 @@ namespace sgc {
          * Type used to store offsets from GC controlled type (class/struct) start to GC pointer
          * fields of the type.
          */
-        using subptr_offset_t = unsigned int;
+        using gcptr_field_offset_t = unsigned int;
 
         /** Signature of the function to invoke destructor. */
         using GcTypeInfoInvokeDestructor = void (*)(void* pObjectMemory) noexcept;
@@ -90,7 +91,7 @@ namespace sgc {
          * Checks if the specified pointer belongs to the memory region of the object of the specified
          * allocation and saves pointer's offset from type start.
          *
-         * @remark Assumes @ref bAllSubPtrOffsetsRegistered is `false`.
+         * @remark Assumes @ref bAllGcPtrFieldOffsetsInitialized is `false`.
          *
          * @param pConstructedPtr Newly constructed pointer object (maybe a field in some object).
          * @param pAllocation     Allocation that may be the owner object of that pointer.
@@ -98,20 +99,20 @@ namespace sgc {
          * @return `true` if registered, `false` if the specified pointer does not belong to the
          * memory region of the specified allocation.
          */
-        bool tryRegisteringSubPtrOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation);
+        bool tryRegisteringGcPtrFieldOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation);
 
         /**
          * Offsets from GC controlled type start to each field that has a GC pointer type.
          *
-         * @remark Might not contain all offsets until @ref bAllSubPtrOffsetsRegistered is `true`.
+         * @remark Might not contain all offsets until @ref bAllGcPtrFieldOffsetsInitialized is `true`.
          */
-        std::vector<subptr_offset_t> vSubPtrOffsets;
+        std::vector<gcptr_field_offset_t> vGcPtrFieldOffsets;
 
         /**
-         * `true` if @ref vSubPtrOffsets is fully initialized and all offsets were added,
+         * `true` if @ref vGcPtrFieldOffsets is fully initialized and all offsets were added,
          * `false` if the type information is still being gathered.
          */
-        bool bAllSubPtrOffsetsInitialized = false;
+        bool bAllGcPtrFieldOffsetsInitialized = false;
 
         /** Pointer to to function to invoke type's destructor. */
         GcTypeInfoInvokeDestructor const pInvokeDestructor = nullptr;

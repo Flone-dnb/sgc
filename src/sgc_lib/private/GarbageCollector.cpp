@@ -40,13 +40,13 @@ namespace sgc {
                     const auto pTypeInfo = pAllocation->getTypeInfo();
 
                     // Check if we already initialized all GC pointer field offsets.
-                    if (pTypeInfo->bAllSubPtrOffsetsInitialized) {
+                    if (pTypeInfo->bAllGcPtrFieldOffsetsInitialized) {
                         // Check the next allocation.
                         continue;
                     }
 
                     // Try registering the offset.
-                    if (pTypeInfo->tryRegisteringSubPtrOffset(pConstructedPtr, pAllocation)) {
+                    if (pTypeInfo->tryRegisteringGcPtrFieldOffset(pConstructedPtr, pAllocation)) {
                         // Found parent object. Exit function.
                         return false;
                     }
