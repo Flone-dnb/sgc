@@ -3,12 +3,13 @@
 // Standard.
 #include <mutex>
 #include <vector>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace sgc {
     class GcPtrBase;
     class GcAllocation;
-    class GcAllocationInfo;
+    struct GcAllocationInfo;
 
     /** Singleton that provides garbage management functionality. */
     class GarbageCollector {
@@ -112,7 +113,7 @@ namespace sgc {
              * @remark Info objects here are owned by allocations from @ref
              * existingAllocations.
              */
-            std::unordered_set<GcAllocationInfo*> allocationInfoRefs;
+            std::unordered_map<GcAllocationInfo*, GcAllocation*> allocationInfoRefs;
         };
 
         GarbageCollector() = default;

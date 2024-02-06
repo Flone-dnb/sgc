@@ -56,11 +56,11 @@ namespace sgc {
             }
 
             // Create new allocation.
-            auto pAllocation = new GcAllocation(pAllocatedMemory);
+            auto pAllocation = new GcAllocation(pAllocatedMemory, pTypeInfo);
 
             // Call constructor on the allocation info
             // (using placement new operator to call constructor).
-            new (pAllocation->getAllocationInfo()) GcAllocationInfo(pTypeInfo);
+            new (pAllocation->getAllocationInfo()) GcAllocationInfo();
 
             {
                 // Add this allocation as being constructed and remove by the end of the scope.
@@ -93,7 +93,9 @@ namespace sgc {
          *
          * @return Allocation info, always valid while this GC allocation object is alive.
          */
-        GcAllocationInfo* getAllocationInfo() const;
+        inline GcAllocationInfo* getAllocationInfo() const {
+            return reinterpret_cast<GcAllocationInfo*>(pAllocatedMemory);
+        }
 
         /**
          * Returns pointer to the allocated user object from @ref pAllocatedMemory.
@@ -113,8 +115,9 @@ namespace sgc {
          *
          * @param pAllocatedMemory Pointer to the allocated memory that stores allocation info and the
          * allocated object.
+         * @param pTypeInfo        User-specified type of this allocation.
          */
-        GcAllocation(void* pAllocatedMemory);
+        GcAllocation(void* pAllocatedMemory, GcTypeInfo* pTypeInfo);
 
         /**
          * Pointer to the allocated memory that stores allocation info and the allocated object.
@@ -122,5 +125,12 @@ namespace sgc {
          * @remark Initialized in constructor, always valid while this GC allocation object is alive.
          */
         void* const pAllocatedMemory = nullptr;
+
+        /**
+         * User-specified type of this allocation.
+         *
+         * @remark Initialized in constructor, always valid because points to a static variable.
+         */
+        GcTypeInfo* const pTypeInfo = nullptr;
     };
 }

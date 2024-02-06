@@ -11,7 +11,7 @@ namespace sgc {
         bIsRootNode = GarbageCollector::get().onGcPointerConstructed(this);
     }
 
-    void GcPtrBase::setNewAllocationInfoFromUserObject(void* pUserObject) {
+    void GcPtrBase::setAllocationFromUserObject(void* pUserObject) {
         // Prepare the error message in case we need it.
         static constexpr auto pNotGcPointerErrorMessage =
             "failed to set the specified raw pointer to a GC pointer because the specified object "
@@ -23,8 +23,8 @@ namespace sgc {
 
         // Check if the specified pointer is valid.
         if (pUserObject == nullptr) {
-            // Just clear internal pointer (keep the GC mutex locked while changing the pointer).
-            pAllocationInfo = nullptr;
+            // Just clear the pointer (keep the GC mutex locked while changing the pointer).
+            pAllocation = nullptr;
             return;
         }
 
@@ -52,7 +52,8 @@ namespace sgc {
             throw std::runtime_error(pNotGcPointerErrorMessage);
         }
 
-        pAllocationInfo = pNewAllocationInfo;
+        // Save allocation.
+        pAllocation = allocationInfoIt->second;
     }
 
     GcPtrBase::~GcPtrBase() {
@@ -64,15 +65,22 @@ namespace sgc {
         }
     }
 
-    GcAllocationInfo* GcPtrBase::getAllocationInfo() const { return pAllocationInfo; }
-
-    void* GcPtrBase::getUserObject() const {
-        // Make sure allocation info is valid.
-        if (pAllocationInfo == nullptr) {
+    GcAllocationInfo* GcPtrBase::getAllocationInfo() const {
+        // Make sure allocation is valid.
+        if (pAllocation == nullptr) {
             return nullptr;
         }
 
-        return pAllocationInfo + static_cast<uintptr_t>(sizeof(GcAllocationInfo));
+        return pAllocation->getAllocationInfo();
+    }
+
+    void* GcPtrBase::getUserObject() const {
+        // Make sure allocation is valid.
+        if (pAllocation == nullptr) {
+            return nullptr;
+        }
+
+        return pAllocation->getAllocatedObject();
     }
 
 }

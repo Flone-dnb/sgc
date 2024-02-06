@@ -6,7 +6,8 @@
 #include "GcAllocation.h"
 
 namespace sgc {
-    class GcAllocationInfo;
+    class GcAllocation;
+    struct GcAllocationInfo;
 
     /** Base class for GC smart pointers, works similar to `std::shared_ptr`. */
     class GcPtrBase {
@@ -53,13 +54,10 @@ namespace sgc {
             std::scoped_lock guard(GarbageCollector::get().mtxAllocationControlledData.first);
 
             // Create a new allocation (it's added to the GC "database" in allocation's constructor).
-            const auto pNewAllocation = GcAllocation::registerNewAllocationWithInfo<Type>(
+            pAllocation = GcAllocation::registerNewAllocationWithInfo<Type>(
                 std::forward<ConstructorArgs>(constructorArgs)...);
 
-            // Save allocation info.
-            pAllocationInfo = pNewAllocation->getAllocationInfo();
-
-            return pNewAllocation->getAllocatedObject();
+            return pAllocation->getAllocatedObject();
         }
 
         /**
@@ -72,15 +70,15 @@ namespace sgc {
          * @param pUserObject Pointer to the object of the user-specified type,
          * if `nullptr` then internal pointer is just set to `nullptr`.
          */
-        void setNewAllocationInfoFromUserObject(void* pUserObject);
+        void setAllocationFromUserObject(void* pUserObject);
 
     private:
         /**
-         * Info about the object that this pointer is pointing to.
+         * Allocation that this pointer is pointing to.
          *
          * @remark Can be `nullptr` if this GC pointer is empty (just like a usual pointer).
          */
-        GcAllocationInfo* pAllocationInfo = nullptr;
+        GcAllocation* pAllocation = nullptr;
 
         /**
          * Defines if this GC pointer object belongs to some other object as a field.
@@ -200,7 +198,7 @@ namespace sgc {
          */
         inline void updateInternalPointers(Type* pUserObject) {
             // Find and save allocation info object.
-            setNewAllocationInfoFromUserObject(pUserObject);
+            setAllocationFromUserObject(pUserObject);
 
 #if defined(DEBUG)
             // Save pointer to the object for debugging.
