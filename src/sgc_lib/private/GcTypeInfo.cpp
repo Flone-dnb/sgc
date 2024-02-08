@@ -19,13 +19,7 @@ namespace sgc {
     }
 
     bool GcTypeInfo::tryRegisteringGcPtrFieldOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation) {
-        // Self check: make sure sub-pointer offsets are not initialized.
-        if (bAllGcPtrFieldOffsetsInitialized) [[unlikely]] {
-            GcInfoCallbacks::getWarningCallback()(
-                "GC controlled type received a request to register sub-pointer offset but all offsets are "
-                "already initialized for this type");
-            return false;
-        }
+        // Don't check if offsets are initialized or not yet.
 
         // Get address of the owner object.
         const auto pOwner = pAllocation->getAllocatedObject();
@@ -35,6 +29,13 @@ namespace sgc {
         const auto iOwnerAddress = reinterpret_cast<uintptr_t>(pOwner);
         if (iPtrAddress < iOwnerAddress || iPtrAddress >= iOwnerAddress + static_cast<uintptr_t>(iTypeSize)) {
             return false;
+        }
+
+        // This GcPtr indeed belongs to the specified allocation.
+        // Now see if offsets are already initialized.
+        if (bAllGcPtrFieldOffsetsInitialized) {
+            // Just return `true` to tell that this GcPtr belongs to the allocation.
+            return true;
         }
 
         // Calculate offset.

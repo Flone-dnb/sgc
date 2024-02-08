@@ -17,7 +17,7 @@ namespace sgc {
         vGrayAllocations.reserve(512); // NOLINT: seems like a good starting capacity
     }
 
-    void GarbageCollector::collectGarbage() {
+    size_t GarbageCollector::collectGarbage() {
         {
             // Apply changes from pending set.
             std::scoped_lock guard(mtxPendingNodeGraphChanges.first, mtxRootNodes.first);
@@ -115,6 +115,7 @@ namespace sgc {
         }
 
         // Now do the "sweep" phase.
+        size_t iDeletedObjectCount = 0;
         for (auto allocationIt = mtxAllocationData.second.existingAllocations.begin();
              allocationIt != mtxAllocationData.second.existingAllocations.end();) {
             // Check allocation color.
@@ -129,8 +130,8 @@ namespace sgc {
             allocationIt = mtxAllocationData.second.existingAllocations.erase(allocationIt);
 
             // Remove the allocation's info.
-            if (mtxAllocationData.second.allocationInfoRefs.erase(
-                    pAllocation->getAllocationInfo()) != 1) [[unlikely]] {
+            if (mtxAllocationData.second.allocationInfoRefs.erase(pAllocation->getAllocationInfo()) != 1)
+                [[unlikely]] {
                 GcInfoCallbacks::getWarningCallback()("GC allocation failed to its allocation info (to be "
                                                       "erased) in the array of existing allocation infos");
             }
@@ -143,7 +144,10 @@ namespace sgc {
 
             // Delete (free) the allocation.
             delete pAllocation;
+            iDeletedObjectCount += 1;
         }
+
+        return iDeletedObjectCount;
     }
 
     std::pair<std::mutex, GarbageCollector::PendingNodeGraphChanges>*
@@ -168,12 +172,6 @@ namespace sgc {
                     // Get allocation and its type.
                     const auto pAllocation = (*allocationIt);
                     const auto pTypeInfo = pAllocation->getTypeInfo();
-
-                    // Check if we already initialized all GC pointer field offsets.
-                    if (pTypeInfo->bAllGcPtrFieldOffsetsInitialized) {
-                        // Check the next allocation.
-                        continue;
-                    }
 
                     // Try registering the offset.
                     if (pTypeInfo->tryRegisteringGcPtrFieldOffset(pConstructedPtr, pAllocation)) {

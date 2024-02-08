@@ -7,7 +7,10 @@
 
 TEST_CASE("use makeGc to create a root node") {
     // Prepare custom type.
-    class Foo {};
+    class Foo {
+    public:
+        sgc::GcPtr<Foo> pInner;
+    };
 
     {
         // Create root node.
@@ -18,7 +21,7 @@ TEST_CASE("use makeGc to create a root node") {
         {
             std::scoped_lock guard(pMtxPendingChanges->first);
 
-            // There should only be our node.
+            // There should only be 1 new root node.
             REQUIRE(pMtxPendingChanges->second.newRootNodes.size() == 1);
             REQUIRE((*pMtxPendingChanges->second.newRootNodes.begin())->getUserObject() == pFoo.get());
             REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.empty());
@@ -33,14 +36,17 @@ TEST_CASE("use makeGc to create a root node") {
             REQUIRE(pMtxRootNodes->second.empty());
         }
 
-        // Run GC.
-        sgc::GarbageCollector::get().collectGarbage();
+        // Run GC to apply the changes.
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+
+        // Create inner.
+        pFoo->pInner = sgc::makeGc<Foo>();
 
         // Check pending changes.
         {
             std::scoped_lock guard(pMtxPendingChanges->first);
 
-            // There should be no nodes.
+            // Temporary root node that was created in `makeGc` was created and destroyed.
             REQUIRE(pMtxPendingChanges->second.newRootNodes.empty());
             REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.empty());
         }
@@ -49,16 +55,16 @@ TEST_CASE("use makeGc to create a root node") {
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
-            // There should only be our node.
+            // There should only be 1 root node.
             REQUIRE(pMtxRootNodes->second.size() == 1);
             REQUIRE((*pMtxRootNodes->second.begin())->getUserObject() == pFoo.get());
         }
 
-        // Clear pointer.
-        pFoo = nullptr;
+        // Clear inner.
+        pFoo->pInner = nullptr;
 
-        // Run GC.
-        sgc::GarbageCollector::get().collectGarbage();
+        // Run GC (inner should be deleted).
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
 
         // Check pending changes.
         {
@@ -79,14 +85,14 @@ TEST_CASE("use makeGc to create a root node") {
         }
     }
 
-    // Scope ended and pFoo was destroyed.
+    // Scope ended and pFoo and pInner were destroyed.
 
     // Check pending changes.
     const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
     {
         std::scoped_lock guard(pMtxPendingChanges->first);
 
-        // There should only be our destroyed node.
+        // There should only be our destroyed root node.
         REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.size() == 1);
         REQUIRE(pMtxPendingChanges->second.newRootNodes.empty());
     }
@@ -100,8 +106,8 @@ TEST_CASE("use makeGc to create a root node") {
         REQUIRE(pMtxRootNodes->second.size() == 1);
     }
 
-    // Run GC to apply pending changes.
-    sgc::GarbageCollector::get().collectGarbage();
+    // Run GC to apply pending changes (Foo should be deleted).
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
 
     // Check pending changes.
     {

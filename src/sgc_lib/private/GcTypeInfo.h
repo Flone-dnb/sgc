@@ -10,8 +10,7 @@ namespace sgc {
 
     /** Stores information about a specific GC controlled type. */
     class GcTypeInfo {
-        // Only garbage collector can view if GcPtr field offsets are initialized or not and register
-        // new ones.
+        // Only garbage collector can register new GcPtr field offsets.
         friend class GarbageCollector;
 
         // Allocation marks GcPtr field offsets as initialized after an object of this type has finished its
@@ -91,13 +90,12 @@ namespace sgc {
          * Checks if the specified pointer belongs to the memory region of the object of the specified
          * allocation and saves pointer's offset from type start.
          *
-         * @remark Assumes @ref bAllGcPtrFieldOffsetsInitialized is `false`.
-         *
          * @param pConstructedPtr Newly constructed pointer object (maybe a field in some object).
          * @param pAllocation     Allocation that may be the owner object of that pointer.
          *
-         * @return `true` if registered, `false` if the specified pointer does not belong to the
-         * memory region of the specified allocation.
+         * @return `true` if the specified pointer belongs to the specified allocation (and pointer's offset
+         * was possibly registered), `false` if the specified pointer does not belong to the memory region of
+         * the specified allocation.
          */
         bool tryRegisteringGcPtrFieldOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation);
 

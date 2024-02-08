@@ -9,7 +9,7 @@ namespace sgc {
     class GcAllocation;
     struct GcAllocationInfo;
 
-    /** Base class for GC smart pointers, works similar to `std::shared_ptr`. */
+    /** Base class for GC smart pointers. */
     class GcPtrBase {
         // Garbage collector inspects referenced allocation.
         friend class GarbageCollector;
@@ -94,6 +94,16 @@ namespace sgc {
         virtual ~GcPtr() override = default;
 
         /**
+         * Constructs a GC pointer from a raw pointer.
+         *
+         * @warning If the pointer to the specified target object was not previously created using `makeGc`
+         * an error will be triggered.
+         *
+         * @param pTargetObject Object to pointer to.
+         */
+        explicit GcPtr(Type* pTargetObject) { updateInternalPointers(pTargetObject); }
+
+        /**
          * Constructs a GC pointer from another GC pointer.
          *
          * @param pOther GC pointer to copy.
@@ -143,16 +153,6 @@ namespace sgc {
         };
 
         /**
-         * Constructs a GC pointer from a raw pointer.
-         *
-         * @warning If the pointer to the specified target object was not previously created using `makeGc`
-         * an error will be triggered.
-         *
-         * @param pTargetObject Object to pointer to.
-         */
-        explicit GcPtr(Type* pTargetObject) { updateInternalPointers(pTargetObject); }
-
-        /**
          * Assignment operator from a raw pointer.
          *
          * @warning If the pointer to the specified target object was not previously created using `makeGc`
@@ -171,6 +171,14 @@ namespace sgc {
          * `false` if pointers are different.
          */
         bool operator==(const GcPtr& pOther) const { return getUserObject() == pOther.getUserObject(); }
+
+        /**
+         * Member access operator.
+         *
+         * @return `nullptr` if this GC pointer is empty, otherwise pointer to the object of the
+         * user-specified type that this pointer is pointing to.
+         */
+        Type* operator->() { return get(); }
 
         /**
          * Returns pointer to the object of the user-specified type that this pointer is pointing to.

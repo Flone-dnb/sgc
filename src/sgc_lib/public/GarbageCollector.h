@@ -60,8 +60,13 @@ namespace sgc {
          */
         static GarbageCollector& get();
 
-        /** Runs garbage collection which might cause some no longer references objects to be destroyed. */
-        void collectGarbage();
+        /**
+         * Runs garbage collection which might cause some no longer references objects to be destroyed.
+         *
+         * @return Number of user object (objects of the user-specified type) that were deleted (freed) during
+         * the garbage collection.
+         */
+        size_t collectGarbage();
 
         /**
          * Returns pointer to read-only data of the garbage collector's internal "pending changes" set.
