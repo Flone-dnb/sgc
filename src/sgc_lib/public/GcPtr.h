@@ -11,21 +11,14 @@ namespace sgc {
 
     /** Base class for GC smart pointers, works similar to `std::shared_ptr`. */
     class GcPtrBase {
+        // Garbage collector inspects referenced allocation.
+        friend class GarbageCollector;
+
     public:
         GcPtrBase(const GcPtrBase&) = delete;
         GcPtrBase& operator=(const GcPtrBase&) = delete;
 
         virtual ~GcPtrBase();
-
-        /**
-         * Returns info about the object that this pointer is pointing to.
-         *
-         * @warning Do not delete (free) returned pointer.
-         *
-         * @return `nullptr` if this GC pointer is empty (just like a usual pointer), otherwise valid
-         * allocation info.
-         */
-        GcAllocationInfo* getAllocationInfo() const;
 
         /**
          * Returns pointer to the object of the user-specified type that this pointer is pointing to.
@@ -51,7 +44,7 @@ namespace sgc {
         template <typename Type, typename... ConstructorArgs>
         inline void* initializeFromNewAllocation(ConstructorArgs&&... constructorArgs) {
             // Make sure we are not running a garbage collection while creating a new allocation.
-            std::scoped_lock guard(GarbageCollector::get().mtxAllocationControlledData.first);
+            std::scoped_lock guard(GarbageCollector::get().mtxAllocationData.first);
 
             // Create a new allocation (it's added to the GC "database" in allocation's constructor).
             pAllocation = GcAllocation::registerNewAllocationWithInfo<Type>(

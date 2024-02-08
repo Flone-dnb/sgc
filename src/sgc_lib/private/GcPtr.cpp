@@ -18,7 +18,7 @@ namespace sgc {
             "(in the raw pointer) was not previously created from `makeGc` call";
 
         // Make sure we are not running a garbage collection.
-        auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationControlledData;
+        auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationData;
         std::scoped_lock guard(mtxAllocationsData.first);
 
         // Check if the specified pointer is valid.
@@ -58,20 +58,9 @@ namespace sgc {
 
     GcPtrBase::~GcPtrBase() {
         if (bIsRootNode) {
-            auto& mtxPendingChanges = GarbageCollector::get().mtxPendingNodeGraphChanges;
-            std::scoped_lock guard(mtxPendingChanges.first);
-
-            mtxPendingChanges.second.destroyedRootNodes.insert(this);
+            // Notify garbage collector.
+            GarbageCollector::get().onRootNodeGcPointerDestroyed(this);
         }
-    }
-
-    GcAllocationInfo* GcPtrBase::getAllocationInfo() const {
-        // Make sure allocation is valid.
-        if (pAllocation == nullptr) {
-            return nullptr;
-        }
-
-        return pAllocation->getAllocationInfo();
     }
 
     void* GcPtrBase::getUserObject() const {

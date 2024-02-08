@@ -13,7 +13,7 @@ namespace sgc {
 
     /** Singleton that provides garbage management functionality. */
     class GarbageCollector {
-        // GC pointers notify garbage collector in constructor.
+        // GC pointers notify garbage collector in constructor/destructor.
         friend class GcPtrBase;
 
         // Modifies array of objects being constructed.
@@ -33,6 +33,8 @@ namespace sgc {
          * which is undesirable.
          */
         struct PendingNodeGraphChanges {
+            PendingNodeGraphChanges();
+
             /**
              * Destructed GC pointers that were root nodes, GC pointers add themselves to this array in their
              * destructor.
@@ -89,26 +91,18 @@ namespace sgc {
 
     private:
         /** Groups mutex guarded data controlled by GC allocations. */
-        struct AllocationControlledData {
+        struct AllocationData {
             /**
              * All not deleted (in-use) allocations allocated by the garbage collector.
              *
-             * @warning Delete (free) pointer from this array and it will erase itself
-             * from this container and its allocation info from @ref allocationInfoRefs.
-             *
-             * @remark Modifications (addition/removal) of this array is done only by
-             * GC allocation objects.
+             * @remark GC allocation objects add themselves to this array in their constructor.
              */
             std::unordered_set<GcAllocation*> existingAllocations;
 
             /**
              * Used for quickly checking if some allocation info pointer is valid.
              *
-             * @warning Do not delete (free) pointers from this container, they will be
-             * erased and deleted by GC allocations.
-             *
-             * @remark Modifications (addition/removal) of this array is done only by
-             * GC allocation objects.
+             * @remark GC allocation objects add themselves to this array in their constructor.
              *
              * @remark Info objects here are owned by allocations from @ref
              * existingAllocations.
@@ -116,7 +110,7 @@ namespace sgc {
             std::unordered_map<GcAllocationInfo*, GcAllocation*> allocationInfoRefs;
         };
 
-        GarbageCollector() = default;
+        GarbageCollector();
 
         /**
          * Called by GC pointers in their constructor to check that pointer belongs to some object
@@ -129,11 +123,18 @@ namespace sgc {
          */
         [[nodiscard]] bool onGcPointerConstructed(GcPtrBase* pConstructedPtr);
 
+        /**
+         * Called by root node GC pointers in their destructor to update pending changes to garbage collector.
+         *
+         * @param pDestroyedRootPtr Destroyed root node GC pointer.
+         */
+        void onRootNodeGcPointerDestroyed(GcPtrBase* pDestroyedRootPtr);
+
         /** Pending changes to the node graph. */
         std::pair<std::mutex, PendingNodeGraphChanges> mtxPendingNodeGraphChanges;
 
-        /** Data controlled by GC allocations. */
-        std::pair<std::recursive_mutex, AllocationControlledData> mtxAllocationControlledData;
+        /** Info about GC allocations. */
+        std::pair<std::recursive_mutex, AllocationData> mtxAllocationData;
 
         /** Nodes in the root set of the garbage collector's node graph. */
         std::pair<std::recursive_mutex, std::unordered_set<const GcPtrBase*>> mtxRootNodes;
@@ -157,5 +158,13 @@ namespace sgc {
          * @remark Must be used with the mutex.
          */
         std::pair<std::recursive_mutex, std::vector<GcAllocation*>> mtxCurrentlyConstructingObjects;
+
+        /**
+         * Stores allocations that are about to be processed.
+         *
+         * @remark GC found pointers that point to allocations in the array but these allocations were
+         * not scanned for inner GcPtr fields yet.
+         */
+        std::vector<GcAllocation*> vGrayAllocations;
     };
 }

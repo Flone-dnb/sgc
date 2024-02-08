@@ -5,7 +5,7 @@ namespace sgc {
     GcAllocation::GcAllocation(void* pAllocatedMemory, GcTypeInfo* pTypeInfo)
         : pAllocatedMemory(pAllocatedMemory), pTypeInfo(pTypeInfo) {
         // Get allocations info.
-        auto& mtxAllocationsInfo = GarbageCollector::get().mtxAllocationControlledData;
+        auto& mtxAllocationsInfo = GarbageCollector::get().mtxAllocationData;
         std::scoped_lock guard(mtxAllocationsInfo.first);
 
         // Add self and allocation info.
@@ -13,7 +13,7 @@ namespace sgc {
         mtxAllocationsInfo.second.allocationInfoRefs[getAllocationInfo()] = this;
 #if defined(DEBUG)
         static_assert(
-            sizeof(GarbageCollector::AllocationControlledData) == 160, // NOLINT
+            sizeof(GarbageCollector::AllocationData) == 160, // NOLINT
             "consider inserting new data");
 #endif
     }
@@ -23,25 +23,10 @@ namespace sgc {
         const auto pAllocationInfo = getAllocationInfo();
         const auto pAllocatedObject = getAllocatedObject();
 
-        // Get allocations info.
-        auto& mtxAllocationsInfo = GarbageCollector::get().mtxAllocationControlledData;
-        std::scoped_lock guard(mtxAllocationsInfo.first);
+        // Call destructor on allocation info.
+        pAllocationInfo->~GcAllocationInfo();
 
-        // Remove self and allocation info.
-        if (mtxAllocationsInfo.second.existingAllocations.erase(this) != 1) [[unlikely]] {
-            GcInfoCallbacks::getWarningCallback()(
-                "GC allocation failed to find self (to be erased) in the array of existing allocations");
-        }
-        if (mtxAllocationsInfo.second.allocationInfoRefs.erase(pAllocationInfo) != 1) [[unlikely]] {
-            GcInfoCallbacks::getWarningCallback()("GC allocation failed to its allocation info (to be "
-                                                  "erased) in the array of existing allocation infos");
-        }
-#if defined(DEBUG)
-        static_assert(
-            sizeof(GarbageCollector::AllocationControlledData) == 160, "consider erasing new data"); // NOLINT
-#endif
-
-        // Call destructor.
+        // Call destructor on allocated object.
         pTypeInfo->getInvokeDestructor()(pAllocatedObject);
 
         // Free the allocated memory.
