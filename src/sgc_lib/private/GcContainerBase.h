@@ -16,6 +16,8 @@ namespace sgc {
         using IterateOverContainerGcPtrItems = void (*)(
             const GcContainerBase* pContainer, const std::function<void(const GcPtrBase*)>& onGcPtrItem);
 
+        GcContainerBase() = delete;
+
         virtual ~GcContainerBase() override = default;
 
         /**
