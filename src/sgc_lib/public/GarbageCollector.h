@@ -7,14 +7,17 @@
 #include <unordered_set>
 
 namespace sgc {
+    class GcNode;
     class GcPtrBase;
+    class GcContainerBase;
     class GcAllocation;
     struct GcAllocationInfo;
 
     /** Singleton that provides garbage management functionality. */
     class GarbageCollector {
-        // GC pointers notify garbage collector in constructor/destructor.
+        // GC pointers and GC containers notify garbage collector in constructor/destructor.
         friend class GcPtrBase;
+        friend class GcContainerBase;
 
         // Modifies array of objects being constructed.
         friend class GcAllocationConstructionGuard;
@@ -41,10 +44,30 @@ namespace sgc {
              *
              * @warning Pointers in this array point to deleted memory.
              */
-            std::unordered_set<const GcPtrBase*> destroyedRootNodes;
+            std::unordered_set<const GcPtrBase*> destroyedGcPtrRootNodes;
 
             /** Newly created GC pointers that should be added to GC node graph as root nodes. */
-            std::unordered_set<const GcPtrBase*> newRootNodes;
+            std::unordered_set<const GcPtrBase*> newGcPtrRootNodes;
+
+            /**
+             * Destructed GC containers that were root nodes, GC containers add themselves to this array in
+             * their destructor.
+             *
+             * @warning Pointers in this array point to deleted memory.
+             */
+            std::unordered_set<const GcContainerBase*> destroyedGcContainerRootNodes;
+
+            /** Newly created GC containers that should be added to GC node graph as root nodes. */
+            std::unordered_set<const GcContainerBase*> newGcContainerRootNodes;
+        };
+
+        /** Groups various GC root nodes. */
+        struct RootNodes {
+            /** GcPtr nodes in the root set of the garbage collector's node graph. */
+            std::unordered_set<const GcPtrBase*> gcPtrRootNodes;
+
+            /** GcContainer nodes in the root set of the garbage collector's node graph. */
+            std::unordered_set<const GcContainerBase*> gcContainerRootNodes;
         };
 
         GarbageCollector(const GarbageCollector&) = delete;
@@ -67,6 +90,13 @@ namespace sgc {
          * the garbage collection.
          */
         size_t collectGarbage();
+
+        /**
+         * Returns the total number of existing (not deleted yet) allocations of user-specified types.
+         *
+         * @return Total number of user-objects alive.
+         */
+        size_t getAliveAllocationCount();
 
         /**
          * Returns pointer to read-only data of the garbage collector's internal "pending changes" set.
@@ -92,7 +122,16 @@ namespace sgc {
          *
          * @return Root nodes in the node graph.
          */
-        std::pair<std::recursive_mutex, std::unordered_set<const GcPtrBase*>>* getRootNodes();
+        std::pair<std::recursive_mutex, RootNodes>* getRootNodes();
+
+        /**
+         * Returns mutex that's locked while the garbage collection is running.
+         *
+         * @warning Do not delete (free) returned pointer.
+         *
+         * @return Mutex.
+         */
+        std::recursive_mutex* getGarbageCollectionMutex();
 
     private:
         /** Groups mutex guarded data controlled by GC allocations. */
@@ -118,22 +157,26 @@ namespace sgc {
         GarbageCollector();
 
         /**
-         * Called by GC pointers in their constructor to check that pointer belongs to some object
-         * currently being created.
+         * Called by GC pointers or GC containers in their constructor to check that node (pointer or a
+         * container) belongs to some object currently being created.
          *
-         * @param pConstructedPtr Constructed GC pointer.
+         * @param pConstructedNode Constructed GC pointer or a GC container.
          *
-         * @return `true` if this pointer is registered as a root node in the node graph and `false`
+         * @return `true` if this node was registered as a root node in the node graph and `false`
          * otherwise.
          */
-        [[nodiscard]] bool onGcPointerConstructed(GcPtrBase* pConstructedPtr);
+        [[nodiscard]] bool onGcNodeConstructed(GcNode* pConstructedNode);
 
         /**
-         * Called by root node GC pointers in their destructor to update pending changes to garbage collector.
+         * Called by root node GC pointers or containers in their destructor to update pending changes to
+         * garbage collector.
          *
-         * @param pDestroyedRootPtr Destroyed root node GC pointer.
+         * @param pRootNode GC pointer or a GC container that was a root node.
          */
-        void onRootNodeGcPointerDestroyed(GcPtrBase* pDestroyedRootPtr);
+        void onGcRootNodeBeingDestroyed(GcNode* pRootNode);
+
+        /** Applies pending changes from @ref mtxPendingNodeGraphChanges. */
+        void applyPendingChanges();
 
         /** Pending changes to the node graph. */
         std::pair<std::mutex, PendingNodeGraphChanges> mtxPendingNodeGraphChanges;
@@ -142,7 +185,7 @@ namespace sgc {
         std::pair<std::recursive_mutex, AllocationData> mtxAllocationData;
 
         /** Nodes in the root set of the garbage collector's node graph. */
-        std::pair<std::recursive_mutex, std::unordered_set<const GcPtrBase*>> mtxRootNodes;
+        std::pair<std::recursive_mutex, RootNodes> mtxRootNodes;
 
         /**
          * Stores GC allocated objects currently being constructed (allocated).

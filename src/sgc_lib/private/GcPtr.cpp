@@ -6,9 +6,21 @@
 
 namespace sgc {
 
-    GcPtrBase::GcPtrBase() {
+    GcPtrBase::GcPtrBase(bool bCanBeRootNode) {
+        // Make sure we can be a root node.
+        if (!bCanBeRootNode) {
+            return;
+        }
+
         // Notify garbage collector.
-        bIsRootNode = GarbageCollector::get().onGcPointerConstructed(this);
+        setIsRootNode(GarbageCollector::get().onGcNodeConstructed(this));
+    }
+
+    GcPtrBase::~GcPtrBase() {
+        if (isRootNode()) {
+            // Notify garbage collector.
+            GarbageCollector::get().onGcRootNodeBeingDestroyed(this);
+        }
     }
 
     void GcPtrBase::setAllocationFromUserObject(void* pUserObject) {
@@ -54,13 +66,6 @@ namespace sgc {
 
         // Save allocation.
         pAllocation = allocationInfoIt->second;
-    }
-
-    GcPtrBase::~GcPtrBase() {
-        if (bIsRootNode) {
-            // Notify garbage collector.
-            GarbageCollector::get().onRootNodeGcPointerDestroyed(this);
-        }
     }
 
     void* GcPtrBase::getUserObject() const {

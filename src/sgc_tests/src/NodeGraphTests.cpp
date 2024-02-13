@@ -5,7 +5,7 @@
 // External.
 #include "catch2/catch_test_macros.hpp"
 
-TEST_CASE("use makeGc to create a root node") {
+TEST_CASE("use makeGc to create a GcPtr root node") {
     // Prepare custom type.
     class Foo {
     public:
@@ -22,9 +22,12 @@ TEST_CASE("use makeGc to create a root node") {
             std::scoped_lock guard(pMtxPendingChanges->first);
 
             // There should only be 1 new root node.
-            REQUIRE(pMtxPendingChanges->second.newRootNodes.size() == 1);
-            REQUIRE((*pMtxPendingChanges->second.newRootNodes.begin())->getUserObject() == pFoo.get());
-            REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+            REQUIRE((*pMtxPendingChanges->second.newGcPtrRootNodes.begin())->getUserObject() == pFoo.get());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
         }
 
         // Get root nodes.
@@ -33,7 +36,8 @@ TEST_CASE("use makeGc to create a root node") {
             std::scoped_lock guard(pMtxRootNodes->first);
 
             // There should be no root nodes yet because pending changes were not applied yet.
-            REQUIRE(pMtxRootNodes->second.empty());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
         }
 
         // Run GC to apply the changes.
@@ -47,8 +51,11 @@ TEST_CASE("use makeGc to create a root node") {
             std::scoped_lock guard(pMtxPendingChanges->first);
 
             // Temporary root node that was created in `makeGc` was created and destroyed.
-            REQUIRE(pMtxPendingChanges->second.newRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
         }
 
         // Check root nodes.
@@ -56,8 +63,8 @@ TEST_CASE("use makeGc to create a root node") {
             std::scoped_lock guard(pMtxRootNodes->first);
 
             // There should only be 1 root node.
-            REQUIRE(pMtxRootNodes->second.size() == 1);
-            REQUIRE((*pMtxRootNodes->second.begin())->getUserObject() == pFoo.get());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
+            REQUIRE((*pMtxRootNodes->second.gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
         }
 
         // Clear inner.
@@ -71,8 +78,11 @@ TEST_CASE("use makeGc to create a root node") {
             std::scoped_lock guard(pMtxPendingChanges->first);
 
             // There should be no nodes.
-            REQUIRE(pMtxPendingChanges->second.newRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
         }
 
         // Check root nodes.
@@ -80,8 +90,8 @@ TEST_CASE("use makeGc to create a root node") {
             std::scoped_lock guard(pMtxRootNodes->first);
 
             // There should only be our node (because GcPtr object still exists).
-            REQUIRE(pMtxRootNodes->second.size() == 1);
-            REQUIRE((*pMtxRootNodes->second.begin())->getUserObject() == pFoo.get());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
+            REQUIRE((*pMtxRootNodes->second.gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
         }
     }
 
@@ -93,8 +103,11 @@ TEST_CASE("use makeGc to create a root node") {
         std::scoped_lock guard(pMtxPendingChanges->first);
 
         // There should only be our destroyed root node.
-        REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.size() == 1);
-        REQUIRE(pMtxPendingChanges->second.newRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.size() == 1);
+        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
+
+        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
     }
 
     // Check root nodes.
@@ -103,7 +116,8 @@ TEST_CASE("use makeGc to create a root node") {
         std::scoped_lock guard(pMtxRootNodes->first);
 
         // There should still be our node.
-        REQUIRE(pMtxRootNodes->second.size() == 1);
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
+        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
     }
 
     // Run GC to apply pending changes (Foo should be deleted).
@@ -114,8 +128,11 @@ TEST_CASE("use makeGc to create a root node") {
         std::scoped_lock guard(pMtxPendingChanges->first);
 
         // All empty.
-        REQUIRE(pMtxPendingChanges->second.destroyedRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.newRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
+
+        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
     }
 
     // Check root nodes.
@@ -123,6 +140,7 @@ TEST_CASE("use makeGc to create a root node") {
         std::scoped_lock guard(pMtxRootNodes->first);
 
         // All empty.
-        REQUIRE(pMtxRootNodes->second.empty());
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
     }
 }

@@ -6,6 +6,7 @@
 // Custom.
 #include "GcAllocation.h"
 #include "GcInfoCallbacks.hpp"
+#include "GcContainerBase.h"
 
 namespace sgc {
 
@@ -18,23 +19,23 @@ namespace sgc {
         return pInvokeDestructor;
     }
 
-    bool GcTypeInfo::tryRegisteringGcPtrFieldOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation) {
-        // Don't check if offsets are initialized or not yet.
+    bool GcTypeInfo::tryRegisteringGcNodeFieldOffset(GcNode* pConstructedNode, GcAllocation* pAllocation) {
+        // Don't check yet if offsets are initialized or not (check later).
 
         // Get address of the owner object.
         const auto pOwner = pAllocation->getAllocatedObject();
 
-        // Make sure the specified pointer is located in the memory region of the owner.
-        const auto iPtrAddress = reinterpret_cast<uintptr_t>(pConstructedPtr);
+        // Make sure the specified GC node is located in the memory region of the owner.
+        const auto iPtrAddress = reinterpret_cast<uintptr_t>(pConstructedNode);
         const auto iOwnerAddress = reinterpret_cast<uintptr_t>(pOwner);
         if (iPtrAddress < iOwnerAddress || iPtrAddress >= iOwnerAddress + static_cast<uintptr_t>(iTypeSize)) {
             return false;
         }
 
-        // This GcPtr indeed belongs to the specified allocation.
+        // This node indeed belongs to the specified allocation.
         // Now see if offsets are already initialized.
-        if (bAllGcPtrFieldOffsetsInitialized) {
-            // Just return `true` to tell that this GcPtr belongs to the allocation.
+        if (bAllGcNodeFieldOffsetsInitialized) {
+            // Just return `true` to tell that this node belongs to the allocation.
             return true;
         }
 
@@ -42,14 +43,18 @@ namespace sgc {
         const auto iFullOffset = iPtrAddress - iOwnerAddress;
 
         // Make sure we won't go out of type limit.
-        if (iFullOffset > std::numeric_limits<gcptr_field_offset_t>::max()) [[unlikely]] {
+        if (iFullOffset > std::numeric_limits<gcnode_field_offset_t>::max()) [[unlikely]] {
             GcInfoCallbacks::getCriticalErrorCallback()(
-                "calculated sub-pointer offset exceeds limit of the type used to store offsets");
+                "calculated sub-node offset exceeds limit of the type used to store offsets");
             throw std::runtime_error("critical error"); // can't continue
         }
 
         // Add offset.
-        vGcPtrFieldOffsets.push_back(static_cast<gcptr_field_offset_t>(iFullOffset));
+        if (dynamic_cast<GcContainerBase*>(pConstructedNode) != nullptr) {
+            vGcContainerFieldOffsets.push_back(static_cast<gcnode_field_offset_t>(iFullOffset));
+        } else {
+            vGcPtrFieldOffsets.push_back(static_cast<gcnode_field_offset_t>(iFullOffset));
+        }
 
         // Registered.
         return true;

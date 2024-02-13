@@ -71,8 +71,8 @@ namespace sgc {
                     Type(std::forward<ConstructorArgs>(constructorArgs)...);
             }
 
-            // GcPtr offsets are initialized (constructors of `GcPtr` objects register themselves).
-            pTypeInfo->bAllGcPtrFieldOffsetsInitialized = true;
+            // GC node offsets are initialized (constructors of GC node objects register themselves).
+            pTypeInfo->bAllGcNodeFieldOffsetsInitialized = true;
 
             return pAllocation;
         }

@@ -6,7 +6,7 @@
 namespace sgc {
     class GcAllocation;
     class GcTypeInfo;
-    class GcPtrBase;
+    class GcNode;
 
     /** Stores information about a specific GC controlled type. */
     class GcTypeInfo {
@@ -19,10 +19,10 @@ namespace sgc {
 
     public:
         /**
-         * Type used to store offsets from GC controlled type (class/struct) start to GC pointer
-         * fields of the type.
+         * Type used to store offsets from GC controlled type (class/struct) start to GC node (GC pointer or a
+         * GC container) fields of the type.
          */
-        using gcptr_field_offset_t = unsigned int;
+        using gcnode_field_offset_t = unsigned int;
 
         /** Signature of the function to invoke destructor. */
         using GcTypeInfoInvokeDestructor = void (*)(void* pObjectMemory) noexcept;
@@ -90,29 +90,36 @@ namespace sgc {
          * Checks if the specified pointer belongs to the memory region of the object of the specified
          * allocation and saves pointer's offset from type start.
          *
-         * @param pConstructedPtr Newly constructed pointer object (maybe a field in some object).
-         * @param pAllocation     Allocation that may be the owner object of that pointer.
+         * @param pConstructedNode Newly constructed GC node (maybe a field in some object).
+         * @param pAllocation      Allocation that may be the owner object of that pointer.
          *
          * @return `true` if the specified pointer belongs to the specified allocation (and pointer's offset
          * was possibly registered), `false` if the specified pointer does not belong to the memory region of
          * the specified allocation.
          */
-        bool tryRegisteringGcPtrFieldOffset(GcPtrBase* pConstructedPtr, GcAllocation* pAllocation);
+        bool tryRegisteringGcNodeFieldOffset(GcNode* pConstructedNode, GcAllocation* pAllocation);
 
         /**
          * Offsets from GC controlled type start to each field that has a GC pointer type.
          *
-         * @remark Might not contain all offsets until @ref bAllGcPtrFieldOffsetsInitialized is `true`.
+         * @remark Might not contain all offsets until @ref bAllGcNodeFieldOffsetsInitialized is `true`.
          */
-        std::vector<gcptr_field_offset_t> vGcPtrFieldOffsets;
+        std::vector<gcnode_field_offset_t> vGcPtrFieldOffsets;
 
         /**
-         * `true` if @ref vGcPtrFieldOffsets is fully initialized and all offsets were added,
-         * `false` if the type information is still being gathered.
+         * Offsets from GC controlled type start to each field that has a GC container type.
+         *
+         * @remark Might not contain all offsets until @ref bAllGcNodeFieldOffsetsInitialized is `true`.
          */
-        bool bAllGcPtrFieldOffsetsInitialized = false;
+        std::vector<gcnode_field_offset_t> vGcContainerFieldOffsets;
 
-        /** Pointer to to function to invoke type's destructor. */
+        /**
+         * `true` if @ref vGcPtrFieldOffsets and @ref vGcContainerFieldOffsets are fully initialized and all
+         * offsets were added, `false` if the type information is still being gathered.
+         */
+        bool bAllGcNodeFieldOffsetsInitialized = false;
+
+        /** Pointer to the function to invoke type's destructor. */
         GcTypeInfoInvokeDestructor const pInvokeDestructor = nullptr;
 
         /** Size in bytes of the type. */

@@ -31,6 +31,10 @@ set(PROJECT_SOURCES
     public/GcInfoCallbacks.hpp
     private/GcAllocationConstructionGuard.h
     private/GcAllocationConstructionGuard.cpp
+    private/GcContainerBase.h
+    private/GcContainerBase.cpp
+    private/GcNode.hpp
+    public/GcVector.hpp
     # add your .h/.cpp files here
 )
 

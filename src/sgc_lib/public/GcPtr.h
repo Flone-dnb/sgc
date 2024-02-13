@@ -4,21 +4,24 @@
 #include "GarbageCollector.h"
 #include "GcTypeInfo.h"
 #include "GcAllocation.h"
+#include "GcNode.hpp"
 
 namespace sgc {
     class GcAllocation;
     struct GcAllocationInfo;
 
     /** Base class for GC smart pointers. */
-    class GcPtrBase {
+    class GcPtrBase : public GcNode {
         // Garbage collector inspects referenced allocation.
         friend class GarbageCollector;
 
     public:
+        GcPtrBase() = delete;
+
         GcPtrBase(const GcPtrBase&) = delete;
         GcPtrBase& operator=(const GcPtrBase&) = delete;
 
-        virtual ~GcPtrBase();
+        virtual ~GcPtrBase() override;
 
         /**
          * Returns pointer to the object of the user-specified type that this pointer is pointing to.
@@ -31,7 +34,13 @@ namespace sgc {
         void* getUserObject() const;
 
     protected:
-        GcPtrBase();
+        /**
+         * Constructor.
+         *
+         * @param bCanBeRootNode `true` if this pointer can be a root node in the GC graph, `false`
+         * otherwise.
+         */
+        explicit GcPtrBase(bool bCanBeRootNode);
 
         /**
          * Allocates a new object of the specified type and registers it in the garbage collector
@@ -44,7 +53,7 @@ namespace sgc {
         template <typename Type, typename... ConstructorArgs>
         inline void* initializeFromNewAllocation(ConstructorArgs&&... constructorArgs) {
             // Make sure we are not running a garbage collection while creating a new allocation.
-            std::scoped_lock guard(GarbageCollector::get().mtxAllocationData.first);
+            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
             // Create a new allocation (it's added to the GC "database" in allocation's constructor).
             pAllocation = GcAllocation::registerNewAllocationWithInfo<Type>(
@@ -72,26 +81,35 @@ namespace sgc {
          * @remark Can be `nullptr` if this GC pointer is empty (just like a usual pointer).
          */
         GcAllocation* pAllocation = nullptr;
-
-        /**
-         * Defines if this GC pointer object belongs to some other object as a field.
-         *
-         * @remark Initialized in constructor and never changed later.
-         */
-        bool bIsRootNode = false;
     };
 
-    /** GC smart pointer for a specific type, works similar to `std::shared_ptr`. */
-    template <typename Type> class GcPtr : protected GcPtrBase {
+    /**
+     * GC smart pointer for a specific type, works similar to `std::shared_ptr`.
+     *
+     * @tparam Type           Type of the object that the pointer will hold.
+     * @tparam bCanBeRootNode Used internally, please use the default value (`true`). Determines
+     * if this GcPtr can be a root node in the GC graph.
+     */
+    template <typename Type, bool bCanBeRootNode = true> class GcPtr : public GcPtrBase {
         // `makeGc` function creates new GC pointer instances.
         template <typename ObjectType, typename... ConstructorArgs>
         friend inline GcPtr<ObjectType> makeGc(ConstructorArgs&&... args);
 
+        // Allow other GC pointers to look into our internals.
+        template <typename OtherType, bool> friend class GcPtr;
+
     public:
-        /** Constructs an empty (`nullptr`) pointer. */
-        GcPtr() = default;
+        /** Used by GC containers. */
+        using value_type = Type;
 
         virtual ~GcPtr() override = default;
+
+        // ----------------------------------------------------------------------------------------
+        //                                 CONSTRUCTORS
+        // ----------------------------------------------------------------------------------------
+
+        /** Constructs an empty (`nullptr`) pointer. */
+        GcPtr() : GcPtrBase(bCanBeRootNode) {}
 
         /**
          * Constructs a GC pointer from a raw pointer.
@@ -101,27 +119,77 @@ namespace sgc {
          *
          * @param pTargetObject Object to pointer to.
          */
-        explicit GcPtr(Type* pTargetObject) { updateInternalPointers(pTargetObject); }
+        explicit GcPtr(Type* pTargetObject) : GcPtrBase(bCanBeRootNode) {
+            updateInternalPointers(pTargetObject);
+        }
 
         /**
          * Constructs a GC pointer from another GC pointer.
          *
          * @param pOther GC pointer to copy.
          */
-        GcPtr(const GcPtr<Type>& pOther) { updateInternalPointers(pOther.get()); };
+        GcPtr(const GcPtr& pOther) : GcPtrBase(bCanBeRootNode) { updateInternalPointers(pOther.get()); };
 
         /**
          * Constructs a GC pointer from another GC pointer.
          *
          * @param pOther GC pointer to move.
          */
-        GcPtr(GcPtr<Type>&& pOther) noexcept {
-            // "Move" data into self.
-            updateInternalPointers(pOther.get());
+        GcPtr(GcPtr&& pOther) noexcept : GcPtrBase(bCanBeRootNode) { *this = std::move(pOther); };
 
-            // Clear moved object.
-            pOther.updateInternalPointers(nullptr);
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type>
+        GcPtr(const GcPtr<ChildType>& pOther) {
+            updateInternalPointers(pOther.get());
+        }
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type>
+        GcPtr(GcPtr<ChildType>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
+            *this = std::move(pOther);
         };
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         */
+        template <bool bOther> GcPtr(const GcPtr<Type, bOther>& pOther) : GcPtrBase(bCanBeRootNode) {
+            updateInternalPointers(pOther.get());
+        };
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         */
+        template <bool bOther> GcPtr(GcPtr<Type, bOther>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
+            *this = std::move(pOther);
+        };
+
+        // ----------------------------------------------------------------------------------------
+        //                                 OPERATOR =
+        // ----------------------------------------------------------------------------------------
+
+        /**
+         * Assignment operator from a raw pointer.
+         *
+         * @warning If the pointer to the specified target object was not previously created using `makeGc`
+         * an error will be triggered.
+         *
+         * @param pTargetObject Object to pointer to.
+         */
+        inline void operator=(Type* pTargetObject) { updateInternalPointers(pTargetObject); }
 
         /**
          * Copy assignment operator from another GC pointer.
@@ -143,6 +211,10 @@ namespace sgc {
          * @return This.
          */
         GcPtr& operator=(GcPtr&& pOther) noexcept {
+            if (this == &pOther) {
+                return *this;
+            }
+
             // "Move" data into self.
             updateInternalPointers(pOther.get());
 
@@ -153,14 +225,79 @@ namespace sgc {
         };
 
         /**
-         * Assignment operator from a raw pointer.
+         * Copy assignment operator from another GC pointer.
          *
-         * @warning If the pointer to the specified target object was not previously created using `makeGc`
-         * an error will be triggered.
+         * @param pOther GC pointer to copy.
          *
-         * @param pTargetObject Object to pointer to.
+         * @return This.
          */
-        inline void operator=(Type* pTargetObject) { updateInternalPointers(pTargetObject); }
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type>
+        GcPtr& operator=(const GcPtr<ChildType>& pOther) {
+            updateInternalPointers(pOther.get());
+            return *this;
+        };
+
+        /**
+         * Move assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         *
+         * @return This.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type>
+        GcPtr& operator=(GcPtr<ChildType>&& pOther) noexcept {
+            // Don't move self to self.
+            if (reinterpret_cast<void*>(this) == reinterpret_cast<void*>(&pOther)) {
+                return *this;
+            }
+
+            // "Move" data into self.
+            updateInternalPointers(pOther.get());
+
+            // Clear moved object.
+            pOther.updateInternalPointers(nullptr);
+
+            return *this;
+        };
+
+        /**
+         * Copy assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         *
+         * @return This.
+         */
+        template <bool bOther> GcPtr& operator=(const GcPtr<Type, bOther>& pOther) {
+            updateInternalPointers(pOther.get());
+            return *this;
+        };
+
+        /**
+         * Move assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         *
+         * @return This.
+         */
+        template <bool bOther> GcPtr& operator=(GcPtr<Type, bOther>&& pOther) noexcept {
+            if (reinterpret_cast<void*>(this) == reinterpret_cast<void*>(&pOther)) {
+                return *this;
+            }
+
+            // "Move" data into self.
+            updateInternalPointers(pOther.get());
+
+            // Clear moved object.
+            pOther.updateInternalPointers(nullptr);
+
+            return *this;
+        };
+
+        // ----------------------------------------------------------------------------------------
+        //                                 OPERATOR ==
+        // ----------------------------------------------------------------------------------------
 
         /**
          * Tests if this GC pointer points to the same user object as the specified other GC pointer.
@@ -171,6 +308,24 @@ namespace sgc {
          * `false` if pointers are different.
          */
         bool operator==(const GcPtr& pOther) const { return getUserObject() == pOther.getUserObject(); }
+
+        /**
+         * Tests if this GC pointer points to the same user object as the specified other GC pointer.
+         *
+         * @param pOther Other GC pointer.
+         *
+         * @return `true` if both GC pointers point to the same object of the user-specified type,
+         * `false` if pointers are different.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type>
+        bool operator==(const GcPtr<ChildType>& pOther) const {
+            return getUserObject() == pOther.getUserObject();
+        }
+
+        // ----------------------------------------------------------------------------------------
+        //                                 OTHER
+        // ----------------------------------------------------------------------------------------
 
         /**
          * Member access operator.

@@ -20,6 +20,8 @@ include(${RELATIVE_CMAKE_HELPERS_PATH}/utils.cmake)
 set(PROJECT_SOURCES
     src/main.cpp
     src/NodeGraphTests.cpp
+    src/InheritanceTests.cpp
+    src/containers/VectorTests.cpp
     # add your .h/.cpp files here
 )
 
