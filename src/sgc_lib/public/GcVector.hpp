@@ -16,10 +16,21 @@ namespace sgc {
      * @tparam InnerType Type that `GcPtr`s of this container will store.
      */
     template <typename OuterType, typename InnerType = typename OuterType::value_type>
-        requires std::same_as<OuterType, GcPtr<InnerType>> &&     // only GcPtr items are supported
-                 (!std::derived_from<InnerType, GcContainerBase>) // inner containers not supported
+        requires(std::same_as<OuterType, GcPtr<InnerType, true>> ||   // only GcPtr items are supported
+                 std::same_as<OuterType, GcPtr<InnerType, false>>) && //
+                (!std::derived_from<InnerType, GcContainerBase>)      // inner containers not supported
     class GcVector : public GcContainerBase {
+        // Allow other container to look into our internals.
+        template <typename SomeOuterType, typename SomeInnerType>
+            requires(std::same_as<SomeOuterType, GcPtr<SomeInnerType, true>> ||
+                     std::same_as<SomeOuterType, GcPtr<SomeInnerType, false>>) &&
+                    (!std::derived_from<SomeInnerType, GcContainerBase>)
+        friend class GcVector;
+
     public:
+        /** Type that we store in `std::vector`. */
+        using vec_item_t = sgc::GcPtr<InnerType, false>;
+
         virtual ~GcVector() override { notifyGarbageCollectorAboutDestruction(); }
 
         /** Creates an empty container. */
@@ -55,8 +66,13 @@ namespace sgc {
          * @param iCount Size of the vector.
          * @param value  Optional value to copy.
          */
-        constexpr explicit GcVector(size_t iCount, const OuterType& value = OuterType())
-            : vData(iCount, value), GcContainerBase(iterateOverGcPtrItems) {}
+        explicit GcVector(size_t iCount, const vec_item_t& value = vec_item_t())
+            : GcContainerBase(iterateOverGcPtrItems) {
+            // Make sure the GC is not currently iterating over this container since we modify the container.
+            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+
+            vData = std::vector<vec_item_t>(iCount, value);
+        }
 
         /**
          * Copy assignment operator.
@@ -91,16 +107,13 @@ namespace sgc {
         }
 
         /**
-         * Compares the contents of vectors lexicographically.
+         * Comparison operator.
          *
-         * @param right Vector which contents to compare with.
+         * @param other Vector which contents to compare with.
          *
-         * @return The relative order of the first pair of non-equivalent elements in lhs and rhs if there are
-         * such elements, lhs.size() <=> rhs.size() otherwise.
+         * @return `true` if containers are equal, `false` if different.
          */
-        constexpr std::strong_ordering operator<=>(const GcVector& right) const noexcept {
-            return vData.operator<=>(right);
-        }
+        constexpr bool operator==(const GcVector& other) const noexcept { return vData == other.vData; }
 
         /**
          * Returns a reference to the element at specified location, with bounds checking.
@@ -109,7 +122,7 @@ namespace sgc {
          *
          * @return Reference to the requested element.
          */
-        constexpr OuterType& at(size_t iPos) { return vData.at(iPos); }
+        constexpr vec_item_t& at(size_t iPos) { return vData.at(iPos); }
 
         /**
          * Returns a reference to the element at specified location. No bounds checking is performed.
@@ -118,7 +131,7 @@ namespace sgc {
          *
          * @return Reference to the requested element.
          */
-        constexpr OuterType& operator[](size_t iPos) { return vData[iPos]; }
+        constexpr vec_item_t& operator[](size_t iPos) { return vData[iPos]; }
 
         /**
          * Returns a reference to the first element in the container.
@@ -127,7 +140,7 @@ namespace sgc {
          *
          * @return Reference to the first element.
          */
-        constexpr OuterType& front() const { return vData.front(); }
+        constexpr vec_item_t& front() { return vData.front(); }
 
         /**
          * Returns a reference to the last element in the container.
@@ -136,14 +149,32 @@ namespace sgc {
          *
          * @return Reference to the last element.
          */
-        constexpr OuterType& back() const { return vData.back(); }
+        constexpr vec_item_t& back() { return vData.back(); }
+
+        /**
+         * Returns a reference to the first element in the container.
+         *
+         * @warning Calling front on an empty container causes undefined behavior.
+         *
+         * @return Reference to the first element.
+         */
+        constexpr vec_item_t& front() const { return vData.front(); }
+
+        /**
+         * Returns a reference to the last element in the container.
+         *
+         * @warning Calling back on an empty container causes undefined behavior.
+         *
+         * @return Reference to the last element.
+         */
+        constexpr vec_item_t& back() const { return vData.back(); }
 
         /**
          * Returns pointer to the underlying array serving as element storage.
          *
          * @return Pointer to the underlying element storage.
          */
-        constexpr OuterType* data() noexcept { return vData.data(); }
+        constexpr vec_item_t* data() noexcept { return vData.data(); }
 
         /**
          * Returns an iterator to the first element of the vector.
@@ -152,7 +183,7 @@ namespace sgc {
          *
          * @return Iterator to the first element.
          */
-        constexpr std::vector<OuterType>::iterator begin() noexcept { return vData.begin(); }
+        constexpr std::vector<vec_item_t>::iterator begin() noexcept { return vData.begin(); }
 
         /**
          * Returns an iterator to the element following the last element of the vector.
@@ -161,7 +192,7 @@ namespace sgc {
          *
          * @return Iterator to the element following the last element.
          */
-        constexpr std::vector<OuterType>::iterator end() noexcept { return vData.end(); }
+        constexpr std::vector<vec_item_t>::iterator end() noexcept { return vData.end(); }
 
         /**
          * Returns an iterator to the first element of the vector.
@@ -170,7 +201,7 @@ namespace sgc {
          *
          * @return Iterator to the first element.
          */
-        constexpr std::vector<OuterType>::const_iterator cbegin() const noexcept { return vData.cbegin(); }
+        constexpr std::vector<vec_item_t>::const_iterator cbegin() const noexcept { return vData.cbegin(); }
 
         /**
          * Returns an iterator to the element following the last element of the vector.
@@ -179,7 +210,7 @@ namespace sgc {
          *
          * @return Iterator to the element following the last element.
          */
-        constexpr std::vector<OuterType>::const_iterator cend() const noexcept { return vData.cend(); }
+        constexpr std::vector<vec_item_t>::const_iterator cend() const noexcept { return vData.cend(); }
 
         /**
          * Returns a reverse iterator to the first element of the reversed vector.
@@ -188,7 +219,7 @@ namespace sgc {
          *
          * @return Reverse iterator to the first element.
          */
-        constexpr std::vector<OuterType>::iterator rbegin() noexcept { return vData.rbegin(); }
+        constexpr std::vector<vec_item_t>::iterator rbegin() noexcept { return vData.rbegin(); }
 
         /**
          * Returns a reverse iterator to the element following the last element of the reversed vector.
@@ -197,7 +228,7 @@ namespace sgc {
          *
          * @return Reverse iterator to the element following the last element.
          */
-        constexpr std::vector<OuterType>::iterator rend() noexcept { return vData.rend(); }
+        constexpr std::vector<vec_item_t>::iterator rend() noexcept { return vData.rend(); }
 
         /**
          * Returns a reverse iterator to the first element of the reversed vector.
@@ -206,7 +237,7 @@ namespace sgc {
          *
          * @return Reverse iterator to the first element.
          */
-        constexpr std::vector<OuterType>::iterator crbegin() const noexcept { return vData.crbegin(); }
+        constexpr std::vector<vec_item_t>::iterator crbegin() const noexcept { return vData.crbegin(); }
 
         /**
          * Returns a reverse iterator to the element following the last element of the reversed vector.
@@ -215,7 +246,7 @@ namespace sgc {
          *
          * @return Reverse iterator to the element following the last element.
          */
-        constexpr std::vector<OuterType>::iterator crend() const noexcept { return vData.crend(); }
+        constexpr std::vector<vec_item_t>::iterator crend() const noexcept { return vData.crend(); }
 
         /**
          * Checks whether the container is empty.
@@ -267,27 +298,83 @@ namespace sgc {
         }
 
         /**
-         * Erases the specified elements from the container.
+         * Inserts elements at the specified location in the container.
          *
-         * @param pos Iterator to the element to remove.
+         * @param pos   Iterator before which the content will be inserted.
+         * @param value Value to insert.
          */
-        inline void erase(std::vector<OuterType>::iterator pos) {
+        inline void insert(std::vector<vec_item_t>::iterator pos, const vec_item_t& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
-            vData.erase(pos);
+            vData.insert(pos, value);
+        }
+
+        /**
+         * Inserts elements at the specified location in the container.
+         *
+         * @param pos   Iterator before which the content will be inserted.
+         * @param value Value to insert.
+         */
+        inline void insert(std::vector<vec_item_t>::iterator pos, vec_item_t&& value) {
+            // Make sure the GC is not currently iterating over this container since we modify the container.
+            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+
+            vData.insert(pos, std::forward<vec_item_t>(value));
+        }
+
+        /**
+         * Inserts elements at the specified location in the container.
+         *
+         * @param pos   Iterator before which the content will be inserted.
+         * @param value Value to insert.
+         */
+        inline void insert(std::vector<vec_item_t>::const_iterator pos, const vec_item_t& value) {
+            // Make sure the GC is not currently iterating over this container since we modify the container.
+            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+
+            vData.insert(pos, value);
+        }
+
+        /**
+         * Inserts elements at the specified location in the container.
+         *
+         * @param pos   Iterator before which the content will be inserted.
+         * @param value Value to insert.
+         */
+        inline void insert(std::vector<vec_item_t>::const_iterator pos, vec_item_t&& value) {
+            // Make sure the GC is not currently iterating over this container since we modify the container.
+            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+
+            vData.insert(pos, std::forward<vec_item_t>(value));
         }
 
         /**
          * Erases the specified elements from the container.
          *
          * @param pos Iterator to the element to remove.
+         *
+         * @return Iterator following the last removed element.
          */
-        inline void erase(std::vector<OuterType>::const_iterator pos) {
+        inline std::vector<vec_item_t>::iterator erase(std::vector<vec_item_t>::iterator pos) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
-            vData.erase(pos);
+            return vData.erase(pos);
+        }
+
+        /**
+         * Erases the specified elements from the container.
+         *
+         * @param pos Iterator to the element to remove.
+         *
+         * @return Iterator following the last removed element.
+         */
+        inline std::vector<vec_item_t>::iterator erase(std::vector<vec_item_t>::const_iterator pos) {
+            // Make sure the GC is not currently iterating over this container since we modify the container.
+            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+
+            return vData.erase(pos);
         }
 
         /**
@@ -295,12 +382,15 @@ namespace sgc {
          *
          * @param first Range of elements to remove.
          * @param last  Range of elements to remove.
+         *
+         * @return Iterator following the last removed element.
          */
-        inline void erase(std::vector<OuterType>::iterator first, std::vector<OuterType>::iterator last) {
+        inline std::vector<vec_item_t>::iterator
+        erase(std::vector<vec_item_t>::iterator first, std::vector<vec_item_t>::iterator last) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
-            vData.erase(first, last);
+            return vData.erase(first, last);
         }
 
         /**
@@ -308,13 +398,15 @@ namespace sgc {
          *
          * @param first Range of elements to remove.
          * @param last  Range of elements to remove.
+         *
+         * @return Iterator following the last removed element.
          */
-        inline void
-        erase(std::vector<OuterType>::const_iterator first, std::vector<OuterType>::const_iterator last) {
+        inline std::vector<vec_item_t>::iterator
+        erase(std::vector<vec_item_t>::const_iterator first, std::vector<vec_item_t>::const_iterator last) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
-            vData.erase(first, last);
+            return vData.erase(first, last);
         }
 
         /**
@@ -322,7 +414,7 @@ namespace sgc {
          *
          * @param valueToAdd Value to add to the container.
          */
-        inline void push_back(const OuterType& valueToAdd) { // NOLINT: use name style as STL
+        inline void push_back(const vec_item_t& valueToAdd) { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
@@ -334,11 +426,11 @@ namespace sgc {
          *
          * @param valueToAdd Value to add to the container.
          */
-        inline void push_back(OuterType&& valueToAdd) { // NOLINT: use name style as STL
+        inline void push_back(vec_item_t&& valueToAdd) { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
-            vData.push_back(std::forward<OuterType>(valueToAdd));
+            vData.push_back(std::forward<vec_item_t>(valueToAdd));
         }
 
         /**
@@ -349,7 +441,7 @@ namespace sgc {
          * @return A reference to the inserted element.
          */
         template <class... Args>
-        inline OuterType& emplace_back(Args&&... args) { // NOLINT: use name style as STL
+        inline vec_item_t& emplace_back(Args&&... args) { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
@@ -382,7 +474,7 @@ namespace sgc {
          * @param iCount New size of the container.
          * @param value  The value to initialize the new elements with.
          */
-        inline void resize(size_t iCount, const OuterType& value) {
+        inline void resize(size_t iCount, const vec_item_t& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
@@ -399,7 +491,8 @@ namespace sgc {
         static inline void iterateOverGcPtrItems(
             const GcContainerBase* pContainer, const std::function<void(const GcPtrBase*)>& onGcPtrItem) {
             // Get this.
-            const auto pThis = reinterpret_cast<const GcVector<OuterType>*>(pContainer);
+            using item_t = GcVector<OuterType>::vec_item_t;
+            const auto pThis = reinterpret_cast<const GcVector<item_t>*>(pContainer);
 
             // Iterate over items.
             for (const auto& pGcPtr : pThis->vData) {
@@ -408,6 +501,6 @@ namespace sgc {
         }
 
         /** Actual array that stores GcPtr items. */
-        std::vector<GcPtr<InnerType, false>> vData;
+        std::vector<vec_item_t> vData;
     };
 }

@@ -128,23 +128,7 @@ namespace sgc {
          *
          * @param pOther GC pointer to copy.
          */
-        GcPtr(const GcPtr& pOther) : GcPtrBase(bCanBeRootNode) { updateInternalPointers(pOther.get()); };
-
-        /**
-         * Constructs a GC pointer from another GC pointer.
-         *
-         * @param pOther GC pointer to move.
-         */
-        GcPtr(GcPtr&& pOther) noexcept : GcPtrBase(bCanBeRootNode) { *this = std::move(pOther); };
-
-        /**
-         * Constructs a GC pointer from another GC pointer.
-         *
-         * @param pOther GC pointer to copy.
-         */
-        template <typename ChildType>
-            requires std::derived_from<ChildType, Type>
-        GcPtr(const GcPtr<ChildType>& pOther) {
+        GcPtr(const GcPtr<Type, bCanBeRootNode>& pOther) : GcPtrBase(bCanBeRootNode) {
             updateInternalPointers(pOther.get());
         }
 
@@ -153,9 +137,7 @@ namespace sgc {
          *
          * @param pOther GC pointer to move.
          */
-        template <typename ChildType>
-            requires std::derived_from<ChildType, Type>
-        GcPtr(GcPtr<ChildType>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
+        GcPtr(GcPtr<Type, bCanBeRootNode>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
             *this = std::move(pOther);
         };
 
@@ -166,7 +148,7 @@ namespace sgc {
          */
         template <bool bOther> GcPtr(const GcPtr<Type, bOther>& pOther) : GcPtrBase(bCanBeRootNode) {
             updateInternalPointers(pOther.get());
-        };
+        }
 
         /**
          * Constructs a GC pointer from another GC pointer.
@@ -174,6 +156,50 @@ namespace sgc {
          * @param pOther GC pointer to move.
          */
         template <bool bOther> GcPtr(GcPtr<Type, bOther>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
+            *this = std::move(pOther);
+        };
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr(const GcPtr<ChildType, bCanBeRootNode>& pOther) : GcPtrBase(bCanBeRootNode) {
+            updateInternalPointers(pOther.get());
+        }
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr(GcPtr<ChildType, bCanBeRootNode>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
+            *this = std::move(pOther);
+        };
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         */
+        template <typename ChildType, bool bOther>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr(const GcPtr<ChildType, bOther>& pOther) : GcPtrBase(bCanBeRootNode) {
+            updateInternalPointers(pOther.get());
+        }
+
+        /**
+         * Constructs a GC pointer from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         */
+        template <typename ChildType, bool bOther>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr(GcPtr<ChildType, bOther>&& pOther) noexcept : GcPtrBase(bCanBeRootNode) {
             *this = std::move(pOther);
         };
 
@@ -231,44 +257,6 @@ namespace sgc {
          *
          * @return This.
          */
-        template <typename ChildType>
-            requires std::derived_from<ChildType, Type>
-        GcPtr& operator=(const GcPtr<ChildType>& pOther) {
-            updateInternalPointers(pOther.get());
-            return *this;
-        };
-
-        /**
-         * Move assignment operator from another GC pointer.
-         *
-         * @param pOther GC pointer to move.
-         *
-         * @return This.
-         */
-        template <typename ChildType>
-            requires std::derived_from<ChildType, Type>
-        GcPtr& operator=(GcPtr<ChildType>&& pOther) noexcept {
-            // Don't move self to self.
-            if (reinterpret_cast<void*>(this) == reinterpret_cast<void*>(&pOther)) {
-                return *this;
-            }
-
-            // "Move" data into self.
-            updateInternalPointers(pOther.get());
-
-            // Clear moved object.
-            pOther.updateInternalPointers(nullptr);
-
-            return *this;
-        };
-
-        /**
-         * Copy assignment operator from another GC pointer.
-         *
-         * @param pOther GC pointer to copy.
-         *
-         * @return This.
-         */
         template <bool bOther> GcPtr& operator=(const GcPtr<Type, bOther>& pOther) {
             updateInternalPointers(pOther.get());
             return *this;
@@ -295,9 +283,95 @@ namespace sgc {
             return *this;
         };
 
+        /**
+         * Copy assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         *
+         * @return This.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr& operator=(const GcPtr<ChildType>& pOther) {
+            updateInternalPointers(pOther.get());
+            return *this;
+        };
+
+        /**
+         * Move assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         *
+         * @return This.
+         */
+        template <typename ChildType>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr& operator=(GcPtr<ChildType>&& pOther) noexcept {
+            // Don't move self to self.
+            if (reinterpret_cast<void*>(this) == reinterpret_cast<void*>(&pOther)) {
+                return *this;
+            }
+
+            // "Move" data into self.
+            updateInternalPointers(pOther.get());
+
+            // Clear moved object.
+            pOther.updateInternalPointers(nullptr);
+
+            return *this;
+        };
+
+        /**
+         * Copy assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to copy.
+         *
+         * @return This.
+         */
+        template <typename ChildType, bool bOther>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr& operator=(const GcPtr<ChildType, bOther>& pOther) {
+            updateInternalPointers(pOther.get());
+            return *this;
+        };
+
+        /**
+         * Move assignment operator from another GC pointer.
+         *
+         * @param pOther GC pointer to move.
+         *
+         * @return This.
+         */
+        template <typename ChildType, bool bOther>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        GcPtr& operator=(GcPtr<ChildType, bOther>&& pOther) noexcept {
+            // Don't move self to self.
+            if (this == &pOther) {
+                return *this;
+            }
+
+            // "Move" data into self.
+            updateInternalPointers(pOther.get());
+
+            // Clear moved object.
+            pOther.updateInternalPointers(nullptr);
+
+            return *this;
+        };
+
         // ----------------------------------------------------------------------------------------
         //                                 OPERATOR ==
         // ----------------------------------------------------------------------------------------
+
+        /**
+         * Tests if this GC pointer points to the same user object as the specified other GC pointer.
+         *
+         * @param pOther Raw pointer to compare with.
+         *
+         * @return `true` if both GC pointers point to the same object of the user-specified type,
+         * `false` if pointers are different.
+         */
+        bool operator==(Type* pOther) const { return getUserObject() == pOther; }
 
         /**
          * Tests if this GC pointer points to the same user object as the specified other GC pointer.
@@ -317,9 +391,35 @@ namespace sgc {
          * @return `true` if both GC pointers point to the same object of the user-specified type,
          * `false` if pointers are different.
          */
+        template <bool bOther> bool operator==(const GcPtr<Type, bOther>& pOther) const {
+            return getUserObject() == pOther.getUserObject();
+        }
+
+        /**
+         * Tests if this GC pointer points to the same user object as the specified other GC pointer.
+         *
+         * @param pOther Other GC pointer.
+         *
+         * @return `true` if both GC pointers point to the same object of the user-specified type,
+         * `false` if pointers are different.
+         */
         template <typename ChildType>
-            requires std::derived_from<ChildType, Type>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
         bool operator==(const GcPtr<ChildType>& pOther) const {
+            return getUserObject() == pOther.getUserObject();
+        }
+
+        /**
+         * Tests if this GC pointer points to the same user object as the specified other GC pointer.
+         *
+         * @param pOther Other GC pointer.
+         *
+         * @return `true` if both GC pointers point to the same object of the user-specified type,
+         * `false` if pointers are different.
+         */
+        template <typename ChildType, bool bOther>
+            requires std::derived_from<ChildType, Type> && (!std::same_as<ChildType, Type>)
+        bool operator==(const GcPtr<ChildType, bOther>& pOther) const {
             return getUserObject() == pOther.getUserObject();
         }
 
@@ -333,7 +433,7 @@ namespace sgc {
          * @return `nullptr` if this GC pointer is empty, otherwise pointer to the object of the
          * user-specified type that this pointer is pointing to.
          */
-        Type* operator->() { return get(); }
+        Type* operator->() const { return get(); }
 
         /**
          * Returns pointer to the object of the user-specified type that this pointer is pointing to.
