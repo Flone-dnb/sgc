@@ -111,6 +111,9 @@ namespace sgc {
         /** Constructs an empty (`nullptr`) pointer. */
         GcPtr() : GcPtrBase(bCanBeRootNode) {}
 
+        /** Constructs an empty (`nullptr`) pointer. */
+        GcPtr(nullptr_t) : GcPtrBase(bCanBeRootNode) {}
+
         /**
          * Constructs a GC pointer from a raw pointer.
          *
@@ -426,6 +429,16 @@ namespace sgc {
         // ----------------------------------------------------------------------------------------
         //                                 OTHER
         // ----------------------------------------------------------------------------------------
+
+        /** Implicit conversion to bool. */
+        operator bool() const { return getUserObject() != nullptr; }
+
+        /**
+         * Dereference operator.
+         *
+         * @return Internal value.
+         */
+        Type& operator*() const { return *get(); }
 
         /**
          * Member access operator.

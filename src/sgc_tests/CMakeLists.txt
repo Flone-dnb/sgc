@@ -19,9 +19,9 @@ include(${RELATIVE_CMAKE_HELPERS_PATH}/utils.cmake)
 # Sources.
 set(PROJECT_SOURCES
     src/main.cpp
-    src/NodeGraphTests.cpp
     src/InheritanceTests.cpp
     src/GcPtrInsideNonGcContainers.cpp
+    src/MiscGcPtrTests.cpp
     src/containers/VectorTests.cpp
     # add your .h/.cpp files here
 )
