@@ -34,7 +34,7 @@ set(PROJECT_SOURCES
     private/GcContainerBase.h
     private/GcContainerBase.cpp
     private/GcNode.hpp
-    public/GcVector.hpp
+    public/gccontainers/GcVector.hpp
     # add your .h/.cpp files here
 )
 
