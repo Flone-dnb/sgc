@@ -1,3 +1,13 @@
+# How to use this library in your project
+
+In your cmake file:
+
+```cmake
+set(SGC_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(<some path here>/sgc SYSTEM)
+target_link_libraries(${PROJECT_NAME} PUBLIC sgc_lib)
+```
+
 # Build
 
 Prerequisites:
