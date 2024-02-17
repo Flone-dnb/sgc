@@ -260,6 +260,29 @@ TEST_CASE("constructing gc pointer from raw pointer is valid") {
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }
 
+TEST_CASE("copying gc pointers does not cause leaks") {
+    class Foo {};
+
+    {
+        sgc::GcPtr<Foo> pPointer2;
+
+        {
+            auto pPointer1 = sgc::makeGc<Foo>();
+            REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+            pPointer2 = pPointer1;
+            REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
 TEST_CASE("moving gc pointers does not cause leaks") {
     class Foo {};
 
@@ -353,4 +376,131 @@ TEST_CASE("gc pointer outer object that stores inner object with a gc field does
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 2);
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("shared pointer outer object that stores inner object with a gc field does not cause leaks") {
+    class Collected {};
+
+    class Inner {
+    public:
+        sgc::GcPtr<Collected> pCollected;
+    };
+
+    class Outer {
+    public:
+        Inner inner;
+    };
+
+    // Make sure no GC object exists.
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+    {
+        auto pOuter = std::make_shared<Outer>();
+        pOuter->inner.pCollected = sgc::makeGc<Collected>();
+
+        // Check pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("unique pointer outer object that stores inner object with a gc field does not cause leaks") {
+    class Collected {};
+
+    class Inner {
+    public:
+        sgc::GcPtr<Collected> pCollected;
+    };
+
+    class Outer {
+    public:
+        Inner inner;
+    };
+
+    // Make sure no GC object exists.
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+    {
+        auto pOuter = std::make_unique<Outer>();
+        pOuter->inner.pCollected = sgc::makeGc<Collected>();
+
+        // Check pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE(
+    "std::vector of objects that have gc fields and another std::vector for refs does not cause leaks") {
+    class Collected {};
+
+    struct MyData {
+        sgc::GcPtr<Collected> pCollected;
+    };
+
+    // Make sure no GC object exists.
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+    constexpr size_t iDataSize = 5;
+
+    {
+        std::vector<MyData> vMyDataRef; // intentionally not using `GcVector`
+
+        {
+            std::vector<MyData> vMyDataOriginal; // intentionally not using `GcVector`
+
+            // Make sure no GC object exists.
+            REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+            for (size_t i = 0; i < iDataSize; i++) {
+                MyData data1;
+                data1.pCollected = sgc::makeGc<Collected>(); // allocate
+                MyData data2;
+                data2.pCollected = data1.pCollected; // create ref
+
+                vMyDataOriginal.push_back(std::move(data1));
+                vMyDataRef.push_back(std::move(data2));
+            }
+
+            REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == iDataSize);
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == iDataSize);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == iDataSize);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
 }

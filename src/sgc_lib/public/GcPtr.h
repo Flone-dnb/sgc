@@ -122,9 +122,7 @@ namespace sgc {
          *
          * @param pTargetObject Object to pointer to.
          */
-        explicit GcPtr(Type* pTargetObject) : GcPtrBase(bCanBeRootNode) {
-            updateInternalPointers(pTargetObject);
-        }
+        GcPtr(Type* pTargetObject) : GcPtrBase(bCanBeRootNode) { updateInternalPointers(pTargetObject); }
 
         /**
          * Constructs a GC pointer from another GC pointer.

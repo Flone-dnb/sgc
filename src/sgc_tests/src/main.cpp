@@ -1,13 +1,13 @@
-#if defined(WIN32)
-#include <Windows.h>
-#include <crtdbg.h>
-#endif
-
 // Custom.
 #include "GcInfoCallbacks.hpp"
 
 // External.
 #include "catch2/catch_session.hpp"
+
+#if defined(WIN32)
+#include <Windows.h>
+#include <crtdbg.h>
+#endif
 
 static inline void gcWarningCallback(const char* pMessage) { throw std::runtime_error(pMessage); }
 

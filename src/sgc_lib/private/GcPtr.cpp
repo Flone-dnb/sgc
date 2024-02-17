@@ -27,7 +27,8 @@ namespace sgc {
         // Prepare the error message in case we need it.
         static constexpr auto pNotGcPointerErrorMessage =
             "failed to set the specified raw pointer to a GC pointer because the specified object "
-            "(in the raw pointer) was not previously created from `makeGc` call";
+            "(in the raw pointer) either: was previously not created from a \"make gc\" call or you tried "
+            "casting to a non-first parent in a type that uses multiple inheritance (which is not supported)";
 
         // Make sure we are not running a garbage collection.
         auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationData;
