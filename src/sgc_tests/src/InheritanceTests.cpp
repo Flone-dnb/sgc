@@ -68,7 +68,6 @@ TEST_CASE("object of child type in pointer of parent type counts as root node") 
 }
 
 TEST_CASE("object of child type in pointer of parent type using operator=") {
-    REQUIRE(false);
     static bool bParentConstructed = false;
     static bool bParentDestructed = false;
     static bool bChildConstructed = false;
