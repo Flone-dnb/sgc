@@ -1,0 +1,51 @@
+name: All
+
+on: [push, pull_request, pull_request_review]
+
+jobs:
+  clang-format:
+    name: Run clang-format
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Run clang-format
+        run: |
+          choco upgrade llvm
+          Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
+          refreshenv
+          echo "Installed $(clang-format --version)."
+          cd .github/scripts/run_clang_format_on_source/
+          go run . ../../../src
+  build-tests-windows:
+    name: Build and run tests on Windows
+    runs-on: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Pull submodules
+      run: git submodule update --init --recursive
+    - name: Create build directory
+      run: mkdir build
+    - name: Build (debug)
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=Debug ..
+        cmake --build . --target ALL_BUILD --config Debug
+      working-directory: build
+    - name: Test (debug)
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=Debug ..
+        cmake --build . --target sgc_tests --config Debug
+        ./OUTPUT/sgc_tests/Debug/sgc_tests
+      working-directory: build
+    - name: Build (release)
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake --build . --target ALL_BUILD --config Release
+      working-directory: build
+    - name: Test (release)
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake --build . --target sgc_tests --config Release
+        ./OUTPUT/sgc_tests/Release/sgc_tests
+      working-directory: build

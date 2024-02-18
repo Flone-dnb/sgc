@@ -25,5 +25,5 @@ int main() {
     sgc::GcInfoCallbacks::setCallbacks(gcWarningCallback, gcCriticalErrorCallback);
 
     // Run tests.
-    Catch::Session().run();
+    return Catch::Session().run();
 }
