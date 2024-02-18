@@ -66,6 +66,15 @@ namespace sgc {
          */
         GcTypeInfoInvokeDestructor getInvokeDestructor() const;
 
+        /**
+         * Returns offsets from type start to GC pointer fields.
+         *
+         * @remark Used for automated tests.
+         *
+         * @return Offsets.
+         */
+        const std::vector<gcnode_field_offset_t>& getGcPtrFieldOffsets();
+
     private:
         /** Static "accessor" for GC controlled type information. */
         template <typename Type> struct GcTypeInfoStatic {

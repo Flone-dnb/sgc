@@ -24,6 +24,90 @@ TEST_CASE("gc pointer comparison") {
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }
 
+TEST_CASE("passed construction arguments to make gc are passed to type constructor") {
+    class Foo {
+    public:
+        Foo() = default;
+        Foo(int iValue) : iValue(iValue) {}
+        Foo(std::unique_ptr<int> pNonCopyable) : pNonCopyable(std::move(pNonCopyable)) {}
+
+        int iValue = 0;
+        std::unique_ptr<int> pNonCopyable;
+    };
+
+    {
+        auto pFoo1 = sgc::makeGc<Foo>();
+        REQUIRE(pFoo1->iValue == 0);
+
+        auto pFoo2 = sgc::makeGc<Foo>(2);
+        REQUIRE(pFoo2->iValue == 2);
+
+        auto pNonCopyable = std::make_unique<int>(3);
+        auto pFoo3 = sgc::makeGc<Foo>(std::move(pNonCopyable));
+        REQUIRE(pFoo3->iValue == 0);
+        REQUIRE(pFoo3->pNonCopyable != nullptr);
+        REQUIRE(*pFoo3->pNonCopyable == 3);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 3);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("gc allocations are destroyed only while collecting garbage") {
+    class Foo {};
+
+    {
+        sgc::GcPtr<Foo> pFoo = sgc::makeGc<Foo>();
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+        pFoo = nullptr; // explicitly reset
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+    }
+
+    {
+        sgc::GcPtr<Foo> pFoo = sgc::makeGc<Foo>();
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    } // pFoo is reset here
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+    // Get root nodes.
+    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    {
+        std::scoped_lock guard(pMtxRootNodes->first);
+
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+    }
+
+    {
+        sgc::GcPtr<Foo> pFoo; // not initialized
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+    // Check root nodes.
+    {
+        std::scoped_lock guard(pMtxRootNodes->first);
+
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+    }
+}
+
 TEST_CASE("GC solves cyclic references (ref created outside constructor") {
     class Foo {
     public:
@@ -247,12 +331,98 @@ TEST_CASE("constructing gc pointer from raw pointer is valid") {
             Foo* pRaw = pCollected.get();
             REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
 
-            pCollectedFromRaw = sgc::GcPtr<Foo>(pRaw);
+            pCollectedFromRaw = pRaw;
             REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
         }
 
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("constructing gc pointer to this from raw pointer is valid") {
+    static bool bConstructorCalled = false;
+    class Foo {
+    public:
+        Foo() {
+            pThis = this;
+            bConstructorCalled = true;
+        }
+
+        sgc::GcPtr<Foo> getThis() { return this; }
+
+        sgc::GcPtr<Foo> pThis;
+    };
+
+    {
+        sgc::GcPtr<Foo> pTopFoo;
+
+        {
+            auto pFoo = sgc::makeGc<Foo>();
+            REQUIRE(bConstructorCalled);
+
+            // Get pending changes.
+            const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+            {
+                std::scoped_lock guard(pMtxPendingChanges->first);
+
+                REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 2);
+                REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+                REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+                REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+            }
+
+            // Get root nodes.
+            const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+            {
+                std::scoped_lock guard(pMtxRootNodes->first);
+
+                REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+                REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            }
+
+            // Apply changes.
+            REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+
+            pTopFoo = pFoo->getThis();
+        }
+
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.size() == 1);
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        // Get root nodes.
+        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        {
+            std::scoped_lock guard(pMtxRootNodes->first);
+
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2); // destroyed gc ptr is still here
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+        // Check root nodes.
+        {
+            std::scoped_lock guard(pMtxRootNodes->first);
+
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        }
     }
 
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
@@ -273,6 +443,25 @@ TEST_CASE("copying gc pointers does not cause leaks") {
             pPointer2 = pPointer1;
             REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
         }
+
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+
+    // same thing but explicitly reset pointer
+    {
+        sgc::GcPtr<Foo> pPointer2;
+
+        auto pPointer1 = sgc::makeGc<Foo>();
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+        pPointer2 = pPointer1;
+        pPointer1 = nullptr;
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
 
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
@@ -503,4 +692,121 @@ TEST_CASE(
 
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == iDataSize);
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+}
+
+TEST_CASE("create and destroy gc pointer between gc collection") {
+    // Prepare custom type.
+    class Foo {
+    public:
+    };
+
+    {
+        auto pFoo = sgc::makeGc<Foo>();
+
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        // Get root nodes.
+        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        {
+            std::scoped_lock guard(pMtxRootNodes->first);
+
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        }
+    } // pFoo destroyed here
+
+    // don't apply pending changes yet
+
+    // Get pending changes.
+    const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+    {
+        std::scoped_lock guard(pMtxPendingChanges->first);
+
+        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());       // pFoo was just removed from
+        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty()); // new root nodes
+
+        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+    }
+
+    // Get root nodes.
+    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    {
+        std::scoped_lock guard(pMtxRootNodes->first);
+
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("call make gc in constructor of gc pointer") {
+    class Bar {
+    public:
+        sgc::GcPtr<int> pTest;
+    };
+
+    class Foo {
+    public:
+        Foo() { pBar = sgc::makeGc<Bar>(); }
+        sgc::GcPtr<Bar> pBar;
+    };
+
+    {
+        auto pFoo = sgc::makeGc<Foo>();
+
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
+        REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 2);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("constructing a gc pointer from a raw pointer that was not created using make gc throws") {
+    class Foo {};
+
+    {
+        auto pFoo = new Foo();
+
+        bool bExceptionThrown = false;
+        try {
+            // Cast to second parent.
+            sgc::GcPtr<Foo> pGcFoo = pFoo;
+        } catch (...) {
+            bExceptionThrown = true;
+        }
+        REQUIRE(bExceptionThrown);
+
+        delete pFoo;
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }

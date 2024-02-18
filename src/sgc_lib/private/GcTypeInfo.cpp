@@ -19,6 +19,10 @@ namespace sgc {
         return pInvokeDestructor;
     }
 
+    const std::vector<GcTypeInfo::gcnode_field_offset_t>& GcTypeInfo::getGcPtrFieldOffsets() {
+        return vGcPtrFieldOffsets;
+    }
+
     bool GcTypeInfo::tryRegisteringGcNodeFieldOffset(GcNode* pConstructedNode, GcAllocation* pAllocation) {
         // Don't check yet if offsets are initialized or not (check later).
 
