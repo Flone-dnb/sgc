@@ -1,3 +1,6 @@
+// Standard.
+#include <functional>
+
 // Custom.
 #include "GarbageCollector.h"
 #include "GcPtr.h"
@@ -72,7 +75,7 @@ TEST_CASE("gc allocations are destroyed only while collecting garbage") {
         sgc::GcPtr<Foo> pFoo = sgc::makeGc<Foo>();
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-    } // pFoo is reset here
+    } // pFoo is destroyed here but not the Foo object
 
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
@@ -536,6 +539,7 @@ TEST_CASE("gc pointer outer object that stores inner object with a gc field does
     class Outer {
     public:
         Inner inner;
+        sgc::GcPtr<Collected> pCollected;
     };
 
     // Make sure no GC object exists.
@@ -543,6 +547,7 @@ TEST_CASE("gc pointer outer object that stores inner object with a gc field does
 
     {
         auto pOuter = sgc::makeGc<Outer>();
+        pOuter->pCollected = sgc::makeGc<Collected>();
         pOuter->inner.pCollected = sgc::makeGc<Collected>();
 
         // Check pending changes.
@@ -557,13 +562,16 @@ TEST_CASE("gc pointer outer object that stores inner object with a gc field does
             REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
         }
 
-        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
+        // There should be 2 child nodes.
+        REQUIRE(sgc::GcTypeInfo::getStaticInfo<Outer>()->getGcPtrFieldOffsets().size() == 2);
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 3);
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
-        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 3);
     }
 
-    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
-    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 2);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 3);
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 3);
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }
 
@@ -808,5 +816,112 @@ TEST_CASE("constructing a gc pointer from a raw pointer that was not created usi
     }
 
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("capture gc pointer in global lambda does not cause leaks") {
+    class Foo {
+    public:
+        int iValue = 0;
+    };
+
+    {
+        auto pFoo = sgc::makeGc<Foo>();
+        pFoo->iValue = 1;
+
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+        const auto callback = [pFoo]() { // new root node is created due to copy
+            REQUIRE(pFoo->iValue == 1);
+            pFoo->iValue = 2;
+        };
+
+        // Check pending changes.
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 2);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        callback();
+
+        // Check pending changes.
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 2);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+TEST_CASE("capture gc pointer in lambda to create a cyclic reference that leaks memory") {
+    class Foo {
+    public:
+        std::function<void()> callback;
+    };
+
+    Foo* pLeakedFoo = nullptr;
+
+    {
+        auto pFoo = sgc::makeGc<Foo>();
+        pFoo->callback = [pFoo]() {}; // new root node is created due to copy
+
+        pLeakedFoo = pFoo.get(); // save raw pointer to use later
+
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 2);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+    } // pFoo is destroyed here but not Foo object
+
+    // Get pending changes.
+    const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+    {
+        std::scoped_lock guard(pMtxPendingChanges->first);
+
+        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1); // callback pointer is still alive
+        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+    // Clear lambda.
+    pLeakedFoo->callback = []() {};
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }
