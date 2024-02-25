@@ -4,8 +4,10 @@
 // Custom.
 #include "GarbageCollector.h"
 #include "GcPtr.h"
+#include "gccontainers/GcVector.hpp"
 
 // External.
+#include "catch2/benchmark/catch_benchmark.hpp"
 #include "catch2/catch_test_macros.hpp"
 
 TEST_CASE("gc pointer comparison") {
@@ -923,5 +925,66 @@ TEST_CASE("capture gc pointer in lambda to create a cyclic reference that leaks 
     pLeakedFoo->callback = []() {};
 
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
+/// Test.
+class Node {
+public:
+    Node() {
+        // Some dummy custom constructor logic.
+        if (!vChildNodes.empty()) {
+            REQUIRE(!vChildNodes.empty());
+        }
+
+        sSomeText = "Hello World! Hello World! Hello World!";
+    }
+    ~Node() {
+        // Some dummy custom destructor logic.
+        if (!vChildNodes.empty()) {
+            REQUIRE(!vChildNodes.empty());
+        }
+    }
+
+    /// Test.
+    sgc::GcPtr<Node> pParent;
+
+    /// Test.
+    sgc::GcVector<sgc::GcPtr<Node>> vChildNodes;
+
+    /// Test.
+    std::string sSomeText;
+};
+
+void createNodeTree(size_t iChildrenCount, sgc::GcPtr<Node> pNode) { // NOLINT
+    if (iChildrenCount == 0) {
+        return;
+    }
+
+    const auto pNewNode = sgc::makeGc<Node>();
+    createNodeTree(iChildrenCount - 1, pNewNode);
+    pNode->vChildNodes.push_back(pNewNode);
+    pNewNode->pParent = pNode;
+}
+
+TEST_CASE("benchmark garbage collection") {
+    {
+        const auto pRootNode = sgc::makeGc<Node>();
+        for (size_t i = 0; i < 100; i++) { // NOLINT
+            const auto pNewNode = sgc::makeGc<Node>();
+            createNodeTree(100, pNewNode); // NOLINT
+            pRootNode->vChildNodes.push_back(pNewNode);
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 10101);
+
+        BENCHMARK("performance on 10k+ node tree - not collected") {
+            REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
+        };
+    }
+
+    BENCHMARK("performance on 10k+ node tree - collected all (no root nodes)") {
+        sgc::GarbageCollector::get().collectGarbage();
+    };
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }
