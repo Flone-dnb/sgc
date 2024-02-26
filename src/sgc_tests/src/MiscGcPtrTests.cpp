@@ -962,9 +962,30 @@ void createNodeTree(size_t iChildrenCount, sgc::GcPtr<Node> pNode) { // NOLINT
     }
 
     const auto pNewNode = sgc::makeGc<Node>();
-    createNodeTree(iChildrenCount - 1, pNewNode);
-    pNode->vChildNodes.push_back(pNewNode);
     pNewNode->pParent = pNode;
+
+    static size_t iRandomCounter = 0;
+    iRandomCounter += 1;
+
+    if (iRandomCounter % 3 == 0) {
+        // Add some empty pointers.
+        pNode->vChildNodes.push_back(sgc::GcPtr<Node>());
+        pNode->vChildNodes.push_back(sgc::GcPtr<Node>());
+    }
+
+    createNodeTree(iChildrenCount - 1, pNewNode);
+
+    if (iChildrenCount % 4 == 0) {
+        // Add some empty pointers.
+        pNode->vChildNodes.push_back(sgc::GcPtr<Node>());
+    }
+
+    pNode->vChildNodes.push_back(pNewNode);
+
+    if (iChildrenCount % 3 == 0) {
+        // Add some empty pointers.
+        pNode->vChildNodes.push_back(sgc::GcPtr<Node>());
+    }
 }
 
 TEST_CASE("benchmark garbage collection") {
@@ -972,18 +993,18 @@ TEST_CASE("benchmark garbage collection") {
         const auto pRootNode = sgc::makeGc<Node>();
         for (size_t i = 0; i < 100; i++) { // NOLINT
             const auto pNewNode = sgc::makeGc<Node>();
-            createNodeTree(100, pNewNode); // NOLINT
+            createNodeTree(1000, pNewNode); // NOLINT
             pRootNode->vChildNodes.push_back(pNewNode);
         }
 
-        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 10101);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 100101);
 
-        BENCHMARK("performance on 10k+ node tree - not collected") {
+        BENCHMARK("performance on 100k+ node tree - not collected") {
             REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         };
     }
 
-    BENCHMARK("performance on 10k+ node tree - collected all (no root nodes)") {
+    BENCHMARK("performance on 100k+ node tree - collected all (no root nodes)") {
         sgc::GarbageCollector::get().collectGarbage();
     };
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);

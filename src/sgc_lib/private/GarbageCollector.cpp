@@ -15,7 +15,7 @@ namespace sgc {
 
     GarbageCollector::GarbageCollector() {
         // Reserve some space for allocations to be processed.
-        vGrayAllocations.reserve(512); // NOLINT: seems like a good starting capacity
+        vGrayAllocations.reserve(1024); // NOLINT: seems like a good starting capacity
     }
 
     void GarbageCollector::applyPendingChanges() {
@@ -297,7 +297,7 @@ namespace sgc {
     }
 
     GarbageCollector::PendingNodeGraphChanges::PendingNodeGraphChanges() {
-        constexpr size_t iReservedCount = 256; // NOLINT: seems like a good starting capacity
+        constexpr size_t iReservedCount = 512; // NOLINT: seems like a good starting capacity
 
         // Reserve some space.
         newGcPtrRootNodes.reserve(iReservedCount);
