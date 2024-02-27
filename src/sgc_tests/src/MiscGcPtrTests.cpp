@@ -991,10 +991,23 @@ void createNodeTree(size_t iChildrenCount, sgc::GcPtr<Node> pNode) { // NOLINT
 TEST_CASE("benchmark garbage collection") {
     {
         const auto pRootNode = sgc::makeGc<Node>();
+
         for (size_t i = 0; i < 100; i++) { // NOLINT
             const auto pNewNode = sgc::makeGc<Node>();
             createNodeTree(1000, pNewNode); // NOLINT
             pRootNode->vChildNodes.push_back(pNewNode);
+        }
+
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 100101);

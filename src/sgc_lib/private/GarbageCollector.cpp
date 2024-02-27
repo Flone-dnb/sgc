@@ -188,7 +188,7 @@ namespace sgc {
                 continue;
             }
 
-            // Remove the allocation.
+            // Remove the allocation (update our iterator).
             allocationIt = mtxAllocationData.second.existingAllocations.erase(allocationIt);
 
             // Remove the allocation's info.
