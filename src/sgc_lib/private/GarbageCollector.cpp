@@ -194,8 +194,9 @@ namespace sgc {
             // Remove the allocation's info.
             if (mtxAllocationData.second.allocationInfoRefs.erase(pAllocation->getAllocationInfo()) != 1)
                 [[unlikely]] {
-                GcInfoCallbacks::getWarningCallback()("GC allocation failed to its allocation info (to be "
-                                                      "erased) in the array of existing allocation infos");
+                GcInfoCallbacks::getWarningCallback()(
+                    "GC allocation failed to find its allocation info (to be "
+                    "erased) in the array of existing allocation info objects");
             }
 
 #if defined(DEBUG)
