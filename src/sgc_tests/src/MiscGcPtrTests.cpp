@@ -675,7 +675,7 @@ TEST_CASE(
     constexpr size_t iDataSize = 5;
 
     {
-        std::vector<MyData> vMyDataRef; // intentionally not using `GcVector`
+        std::vector<MyData> vMyDataRef; // intentionally not using `GcVector` because not storing `GcPtr`s
 
         {
             std::vector<MyData> vMyDataOriginal; // intentionally not using `GcVector`
