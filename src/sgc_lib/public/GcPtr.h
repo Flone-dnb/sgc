@@ -479,7 +479,7 @@ namespace sgc {
          *
          * @remark Only used for debugging purposes, to see the pointing object in debugger.
          */
-        Type* pDebugPtr = nullptr;
+        volatile Type* pDebugPtr = nullptr;
 #endif
     };
 
