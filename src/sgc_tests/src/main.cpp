@@ -9,10 +9,6 @@
 #include <crtdbg.h>
 #endif
 
-static inline void gcWarningCallback(const char* pMessage) { throw std::runtime_error(pMessage); }
-
-static inline void gcCriticalErrorCallback(const char* pMessage) { throw std::runtime_error(pMessage); }
-
 int main() {
     // Enable run-time memory check for debug builds (on Windows).
 #if defined(WIN32) && defined(DEBUG)
@@ -22,7 +18,9 @@ int main() {
 #endif
 
     // Set warn/error callbacks.
-    sgc::GcInfoCallbacks::setCallbacks(gcWarningCallback, gcCriticalErrorCallback);
+    sgc::GcInfoCallbacks::setCallbacks(
+        [](const char* pMessage) { throw std::runtime_error(pMessage); },
+        [](const char* pMessage) { throw std::runtime_error(pMessage); });
 
     // Run tests.
     return Catch::Session().run();

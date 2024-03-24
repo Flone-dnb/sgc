@@ -5,19 +5,17 @@ First, set garbage collector callbacks:
 ```Cpp
 #include "GcInfoCallbacks.hpp"
 
-static inline void gcWarningCallback(const char* pMessage) {
-    // garbage collector produced a warning message
-    // do something here (logging for example)
-}
-
-static inline void gcCriticalErrorCallback(const char* pMessage) {
-    // garbage collector produced a critical error message
-    // do something here (logging for example)
-    // most likelly the GC will throw an exception or crash after this callback
-}
-
 int main() {
-    sgc::GcInfoCallbacks::setCallbacks(gcWarningCallback, gcCriticalErrorCallback);
+    sgc::GcInfoCallbacks::setCallbacks(
+        [](const char* pWarningMessage) {
+            // garbage collector produced a warning message
+            // do something here (log the message for example)
+        },
+        [](const char* pCriticalErrorMessage) {
+            // garbage collector produced a critical error message
+            // do something here (log the message for example)
+            // most likelly the GC will throw an exception or crash after this callback
+        });
 }
 ```
 
