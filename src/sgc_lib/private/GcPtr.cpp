@@ -14,9 +14,21 @@ namespace sgc {
 
         // Notify garbage collector.
         setIsRootNode(GarbageCollector::get().onGcNodeConstructed(this));
+
+        SGC_DEBUG_LOG(std::format(
+            "GcPtr {} is constructed (is root node: {})", reinterpret_cast<uintptr_t>(this), isRootNode()));
     }
 
-    GcPtrBase::~GcPtrBase() {
+    void GcPtrBase::onGcPtrBeingDestroyed() {
+        // Make sure no GcPtr will be destroyed while garbage collection is running
+        // otherwise GC might stumble upon deleted memory.
+        std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+
+        SGC_DEBUG_LOG(std::format(
+            "GcPtr {} is being destroyed (is root node: {})",
+            reinterpret_cast<uintptr_t>(this),
+            isRootNode()));
+
         if (isRootNode()) {
             // Notify garbage collector.
             GarbageCollector::get().onGcRootNodeBeingDestroyed(this);
@@ -33,6 +45,11 @@ namespace sgc {
         // Make sure we are not running a garbage collection.
         auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationData;
         std::scoped_lock guard(mtxAllocationsData.first);
+
+        SGC_DEBUG_LOG(std::format(
+            "GcPtr {} set user object {}",
+            reinterpret_cast<uintptr_t>(this),
+            reinterpret_cast<uintptr_t>(pUserObject)));
 
         // Check if the specified pointer is valid.
         if (pUserObject == nullptr) {
@@ -61,6 +78,10 @@ namespace sgc {
         const auto allocationInfoIt = allocationInfos.find(pNewAllocationInfo);
         if (allocationInfoIt == allocationInfos.end()) [[unlikely]] {
             // Not a valid GC object.
+            SGC_DEBUG_LOG(std::format(
+                "failed to find user object {} for GcPtr {} to set",
+                reinterpret_cast<uintptr_t>(pUserObject),
+                reinterpret_cast<uintptr_t>(this)));
             GcInfoCallbacks::getCriticalErrorCallback()(pNotGcPointerErrorMessage);
             throw std::runtime_error(pNotGcPointerErrorMessage);
         }

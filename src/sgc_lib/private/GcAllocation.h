@@ -58,7 +58,7 @@ namespace sgc {
             // Create new allocation.
             auto pAllocation = new GcAllocation(pAllocatedMemory, pTypeInfo);
 
-            // Call constructor on the allocation info
+            // Call constructor on the allocation info (before running user type's constructor)
             // (using placement new operator to call constructor).
             new (pAllocation->getAllocationInfo()) GcAllocationInfo();
 

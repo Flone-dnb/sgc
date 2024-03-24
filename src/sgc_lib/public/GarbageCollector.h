@@ -109,7 +109,7 @@ namespace sgc {
          *
          * @return Pending changes to node graph.
          */
-        std::pair<std::mutex, PendingNodeGraphChanges>* getPendingNodeGraphChanges();
+        std::pair<std::recursive_mutex, PendingNodeGraphChanges>* getPendingNodeGraphChanges();
 
         /**
          * Returns pointer to read-only data of the garbage collector's internal root node set.
@@ -179,7 +179,7 @@ namespace sgc {
         void applyPendingChanges();
 
         /** Pending changes to the node graph. */
-        std::pair<std::mutex, PendingNodeGraphChanges> mtxPendingNodeGraphChanges;
+        std::pair<std::recursive_mutex, PendingNodeGraphChanges> mtxPendingNodeGraphChanges;
 
         /** Info about GC allocations. */
         std::pair<std::recursive_mutex, AllocationData> mtxAllocationData;

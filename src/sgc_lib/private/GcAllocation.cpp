@@ -1,5 +1,8 @@
 #include "GcAllocation.h"
 
+// Custom.
+#include "DebugLogger.hpp"
+
 namespace sgc {
 
     GcAllocation::GcAllocation(void* pAllocatedMemory, GcTypeInfo* pTypeInfo)
@@ -7,6 +10,10 @@ namespace sgc {
         // Get allocations info.
         auto& mtxAllocationsInfo = GarbageCollector::get().mtxAllocationData;
         std::scoped_lock guard(mtxAllocationsInfo.first);
+
+        SGC_DEBUG_LOG(std::format(
+            "GcAllocation() with user object {} being constructed",
+            reinterpret_cast<uintptr_t>(getAllocatedObject())));
 
         // Add self and allocation info.
         mtxAllocationsInfo.second.existingAllocations.insert(this);
@@ -19,6 +26,10 @@ namespace sgc {
     }
 
     GcAllocation::~GcAllocation() {
+        SGC_DEBUG_LOG(std::format(
+            "GcAllocation() with user object {} being destroyed",
+            reinterpret_cast<uintptr_t>(getAllocatedObject())));
+
         // Get allocated data.
         const auto pAllocationInfo = getAllocationInfo();
         const auto pAllocatedObject = getAllocatedObject();

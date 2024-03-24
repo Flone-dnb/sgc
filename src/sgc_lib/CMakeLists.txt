@@ -34,6 +34,7 @@ set(PROJECT_SOURCES
     private/GcContainerBase.h
     private/GcContainerBase.cpp
     private/GcNode.hpp
+    private/DebugLogger.hpp
     public/gccontainers/GcVector.hpp
     # add your .h/.cpp files here
 )
@@ -81,4 +82,14 @@ enable_doxygen(${CMAKE_CURRENT_SOURCE_DIR}/../../docs)
 #                                       DEPENDENCIES
 # -------------------------------------------------------------------------------------------------
 
-# nothing here yet
+if (OFF) # change to enable debug logging for debugging
+    message(WARNING "debug logging is enabled")
+
+    # External: spdlog.
+    message(STATUS "${PROJECT_NAME}: adding external dependency \"spdlog\"...")
+    set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)
+    set(SPDLOG_USE_STD_FORMAT ON CACHE BOOL "" FORCE)
+    add_subdirectory(${RELATIVE_EXT_PATH}/spdlog ${DEPENDENCY_BUILD_DIR_NAME}/spdlog SYSTEM)
+    target_link_libraries(${PROJECT_NAME} PUBLIC spdlog::spdlog)
+    set_target_properties(spdlog PROPERTIES FOLDER ${EXTERNAL_FOLDER})
+endif()

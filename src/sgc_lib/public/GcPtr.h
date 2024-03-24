@@ -5,6 +5,7 @@
 #include "GcTypeInfo.h"
 #include "GcAllocation.h"
 #include "GcNode.hpp"
+#include "DebugLogger.hpp"
 
 namespace sgc {
     class GcAllocation;
@@ -21,7 +22,7 @@ namespace sgc {
         GcPtrBase(const GcPtrBase&) = delete;
         GcPtrBase& operator=(const GcPtrBase&) = delete;
 
-        virtual ~GcPtrBase() override;
+        virtual ~GcPtrBase() override = default;
 
         /**
          * Returns pointer to the object of the user-specified type that this pointer is pointing to.
@@ -42,6 +43,9 @@ namespace sgc {
          */
         explicit GcPtrBase(bool bCanBeRootNode);
 
+        /** Must be called by derived types in their destructor. */
+        void onGcPtrBeingDestroyed();
+
         /**
          * Allocates a new object of the specified type and registers it in the garbage collector
          * to be tracked if referenced by GC pointers or not.
@@ -55,9 +59,17 @@ namespace sgc {
             // Make sure we are not running a garbage collection while creating a new allocation.
             std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
+            SGC_DEBUG_LOG(
+                std::format("GcPtr {} started creating a new allocation", reinterpret_cast<uintptr_t>(this)));
+
             // Create a new allocation (it's added to the GC "database" in allocation's constructor).
             pAllocation = GcAllocation::registerNewAllocationWithInfo<Type>(
                 std::forward<ConstructorArgs>(constructorArgs)...);
+
+            SGC_DEBUG_LOG(std::format(
+                "GcPtr {} finished creating a new allocation with user object {}",
+                reinterpret_cast<uintptr_t>(this),
+                reinterpret_cast<uintptr_t>(pAllocation->getAllocatedObject())));
 
             return pAllocation->getAllocatedObject();
         }
@@ -102,7 +114,7 @@ namespace sgc {
         /** Used by GC containers. */
         using value_type = Type;
 
-        virtual ~GcPtr() override = default;
+        virtual ~GcPtr() override { onGcPtrBeingDestroyed(); }
 
         // ----------------------------------------------------------------------------------------
         //                                 CONSTRUCTORS

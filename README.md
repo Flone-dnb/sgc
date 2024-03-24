@@ -294,6 +294,7 @@ Similarly to `GcVector` you can add support for other containers to store `GcPtr
 - Make sure to call `notifyGarbageCollectorAboutDestruction` in your GC container's destructor.
 - Make sure that your internal container (non-GC container that you are wrapping) stays in a valid state after it was `move`d (for example, has a size of 0) so that the garbage collector can still iterate over it without any problems after it was `move`d.
 - Implement all tests from `sgc_tests/src/containers/VectorTests.cpp` according to your container's functionality.
+- Add some usage of your new container to the multi-threaded tests at `src/sgc_tests/src/MultithreadingTests.cpp` (similar to how `GcVector` is used there).
 
 
 # Build

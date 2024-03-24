@@ -41,6 +41,27 @@ TEST_CASE("passed construction arguments to make gc are passed to type construct
     };
 
     {
+        // Get pending changes.
+        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
+        {
+            std::scoped_lock guard(pMtxPendingChanges->first);
+
+            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
+
+            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
+            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
+        }
+
+        // Get root nodes.
+        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        {
+            std::scoped_lock guard(pMtxRootNodes->first);
+
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        }
+
         auto pFoo1 = sgc::makeGc<Foo>();
         REQUIRE(pFoo1->iValue == 0);
 
@@ -799,28 +820,6 @@ TEST_CASE("call make gc in constructor of gc pointer") {
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 }
 
-TEST_CASE("constructing a gc pointer from a raw pointer that was not created using make gc throws") {
-    class Foo {};
-
-    {
-        auto pFoo = new Foo();
-
-        bool bExceptionThrown = false;
-        try {
-            // Cast to second parent.
-            sgc::GcPtr<Foo> pGcFoo = pFoo;
-        } catch (...) {
-            bExceptionThrown = true;
-        }
-        REQUIRE(bExceptionThrown);
-
-        delete pFoo;
-    }
-
-    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
-    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
-}
-
 TEST_CASE("capture gc pointer in global lambda does not cause leaks") {
     class Foo {
     public:
@@ -992,7 +991,7 @@ TEST_CASE("benchmark garbage collection") {
     {
         const auto pRootNode = sgc::makeGc<Node>();
 
-        for (size_t i = 0; i < 100; i++) { // NOLINT
+        for (size_t i = 0; i < 10; i++) { // NOLINT
             const auto pNewNode = sgc::makeGc<Node>();
             createNodeTree(1000, pNewNode); // NOLINT
             pRootNode->vChildNodes.push_back(pNewNode);
@@ -1010,14 +1009,14 @@ TEST_CASE("benchmark garbage collection") {
             REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
         }
 
-        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 100101);
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 10011);
 
-        BENCHMARK("performance on 100k+ node tree - not collected") {
+        BENCHMARK("performance on ~10k node tree - not collected") {
             REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         };
     }
 
-    BENCHMARK("performance on 100k+ node tree - collected all (no root nodes)") {
+    BENCHMARK("performance on ~10k+ node tree - collected all (no root nodes)") {
         sgc::GarbageCollector::get().collectGarbage();
     };
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);

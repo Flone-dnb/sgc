@@ -22,6 +22,9 @@ set(PROJECT_SOURCES
     src/InheritanceTests.cpp
     src/GcPtrInsideNonGcContainers.cpp
     src/MiscGcPtrTests.cpp
+    src/ThreadPool.cpp
+    src/ThreadPool.h
+    src/MultithreadingTests.cpp
     src/containers/VectorTests.cpp
     # add your .h/.cpp files here
 )
