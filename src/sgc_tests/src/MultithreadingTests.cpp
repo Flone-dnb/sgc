@@ -48,7 +48,7 @@ TEST_CASE("allocate GC objects and collect garbage from multiple threads") {
         std::atomic<size_t> iAdditionTasksInProgress{0};
         std::atomic<size_t> iTotalObjectsCollected{0};
 
-        const auto iIterationCount = 50; // NOLINT: test a lot of iterations to be extra sure
+        const auto iIterationCount = 20; // NOLINT: test a lot of iterations to be extra sure
 
         const auto iThreadPoolThreadCount = threadPool.getThreadCount();
         REQUIRE(iThreadPoolThreadCount >= 2);

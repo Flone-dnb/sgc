@@ -783,6 +783,53 @@ TEST_CASE("capture gc pointer in lambda to create a cyclic reference that leaks 
     }
 }
 
+TEST_CASE("capture this (GC controlled) in a lambda") {
+    class Foo {
+    public:
+        std::function<void()> getCallback1() {
+            return [&]() { sText = "Callback 1"; };
+        }
+        std::function<void()> getCallback2() {
+            return [this]() { sText = "Callback 2"; };
+        }
+
+    private:
+        std::string sText;
+    };
+
+    {
+        auto pFoo = sgc::makeGc<Foo>();
+
+        const auto callback1 = pFoo->getCallback1();
+        const auto callback2 = pFoo->getCallback2();
+
+        // Get root nodes.
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        {
+            std::scoped_lock guard(*mtxRootNodes.first);
+
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
+        }
+
+        REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
+
+        callback1();
+        callback2();
+
+        // Check root nodes.
+        {
+            std::scoped_lock guard(*mtxRootNodes.first);
+
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
+        }
+    }
+
+    REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
+    REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
+}
+
 /// Test.
 class Node {
 public:
