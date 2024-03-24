@@ -314,42 +314,18 @@ TEST_CASE("make sure gc vector actually does not cause memory leaks") {
                                          // that it belongs to pFoo object
         pStdArray = &pFoo->vStdArray;    // save a raw pointer to delete the memory manually later
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
             REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
         }
 
-        // Run GC to apply the changes.
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
 
         // Check root nodes.
         {
@@ -360,42 +336,18 @@ TEST_CASE("make sure gc vector actually does not cause memory leaks") {
         }
     } // 1 pFoo GcPtr is destroyed here
 
-    // Get pending changes.
-    const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-    {
-        std::scoped_lock guard(pMtxPendingChanges->first);
-
-        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.size() == 1);
-    }
-
     // Get root nodes.
     const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
         std::scoped_lock guard(pMtxRootNodes->first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
         REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
     }
 
-    // Apply changes and collect memory if possible.
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-
-    // Check pending changes.
-    {
-        std::scoped_lock guard(pMtxPendingChanges->first);
-
-        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-    }
 
     // Check root nodes.
     {
@@ -426,42 +378,18 @@ TEST_CASE("make sure gc vector actually does not cause memory leaks") {
         auto pFoo = sgc::makeGc<Foo>();
         pFoo->vGcArray.push_back(pFoo);
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
             REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
         }
 
-        // Run GC to apply the changes.
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
 
         // Check root nodes.
         {
@@ -490,42 +418,18 @@ TEST_CASE("new vector elements are not registered as root nodes") {
             vTest.push_back(sgc::GcPtr<int>()); // insert empty pointer
             vTest.push_back(pValue);            // insert non-empty pointer
 
-            // Get pending changes.
-            const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-            {
-                std::scoped_lock guard(pMtxPendingChanges->first);
-
-                REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.size() == 1);
-                REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-                REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
-                REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-            }
-
             // Get root nodes.
             const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
             {
                 std::scoped_lock guard(pMtxRootNodes->first);
 
-                REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-                REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+                REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
+                REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.size() == 1);
             }
 
-            // Run GC to apply the changes.
             REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
             REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
             REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-
-            // Check pending changes.
-            {
-                std::scoped_lock guard(pMtxPendingChanges->first);
-
-                REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-                REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-                REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-                REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-            }
 
             // Check root nodes.
             {
@@ -536,42 +440,19 @@ TEST_CASE("new vector elements are not registered as root nodes") {
             }
         } // pValue GC pointer is destroyed here
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.size() == 1);
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
             REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
         }
 
         // Object should still be alive (since there is a pointer in our vector).
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
 
         // Check root nodes.
         {
@@ -602,42 +483,18 @@ TEST_CASE("vector is non root node when used as a field in GC object") {
         pFoo->vTest.push_back(sgc::GcPtr<int>());   // insert empty pointer
         pFoo->vTest.push_back(sgc::makeGc<int>(1)); // insert non-empty pointer
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
             REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
         }
 
-        // Run GC to apply the changes.
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
 
         // Check root nodes.
         {
@@ -672,42 +529,18 @@ TEST_CASE("vector is root node when used as a field in non-GC object") {
         foo.vTest.push_back(sgc::GcPtr<int>());   // insert empty pointer
         foo.vTest.push_back(sgc::makeGc<int>(1)); // insert non-empty pointer
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.size() == 1);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
             REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.size() == 1);
         }
 
-        // Run GC to apply the changes.
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
 
         // Check root nodes.
         {
@@ -766,25 +599,13 @@ TEST_CASE("add a GC pointer of child class to GC vector") {
         REQUIRE(dynamic_cast<Child*>(vTest[1].get()) == nullptr);
         REQUIRE(dynamic_cast<Child*>(vTest[2].get()) != nullptr);
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.size() == 1);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
             REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.size() == 1);
         }
     }
 
@@ -805,43 +626,19 @@ TEST_CASE("storing gc vector in pair does not cause leaks") {
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
             REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
         }
 
         // Set valid value.
         pFoo->pair.second.push_back(pFoo);
 
-        // Apply changes.
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-        }
 
         // Check root nodes.
         {

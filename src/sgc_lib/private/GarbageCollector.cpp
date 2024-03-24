@@ -19,92 +19,17 @@ namespace sgc {
         vGrayAllocations.reserve(1024); // NOLINT: seems like a good starting capacity
     }
 
-    void GarbageCollector::applyPendingChanges() {
-        // Apply changes from pending set.
-        std::scoped_lock guard(mtxPendingNodeGraphChanges.first, mtxRootNodes.first);
-        auto& changes = mtxPendingNodeGraphChanges.second;
-
-        SGC_DEBUG_LOG("applying pending changes");
-
-        // It's important to first remove destroyed nodes and only then add created
-        // because we had a bug where GcPtr was being created and destroyed in the loop
-        // then GcPtr from the previous iteration was added as destroyed and
-        // on the new iteration a new GcPtr was using the same address as from the previous
-        // iteration (and added itself as a new root node) thus we were failing because
-        // we were first adding GcPtr from the new iteration and then removing GcPtr
-        // from the previous iteration but both had the same address so we were
-        // accidentally removing a valid node in the node graph
-
-        // Remove destroyed GcPtr root nodes.
-        for (const auto pDestoryedGcPtrRootNode : changes.destroyedGcPtrRootNodes) {
-            if (mtxRootNodes.second.gcPtrRootNodes.erase(pDestoryedGcPtrRootNode) != 1) [[unlikely]] {
-                // Something is wrong.
-                GcInfoCallbacks::getCriticalErrorCallback()(
-                    "a destroyed GcPtr root node is marked as pending to be removed from GC but it's not "
-                    "found in the root set");
-                throw std::runtime_error("critical error");
-            }
-            SGC_DEBUG_LOG(std::format(
-                "removed destroyed root GcPtr {}", reinterpret_cast<uintptr_t>(pDestoryedGcPtrRootNode)));
-        }
-        changes.destroyedGcPtrRootNodes.clear();
-
-        // Remove destroyed GcContainer root nodes.
-        for (const auto pDestroyedContainerRootNode : changes.destroyedGcContainerRootNodes) {
-            if (mtxRootNodes.second.gcContainerRootNodes.erase(pDestroyedContainerRootNode) != 1)
-                [[unlikely]] {
-                // Something is wrong.
-                GcInfoCallbacks::getCriticalErrorCallback()("a destroyed GcContainer root node is marked as "
-                                                            "pending to be removed from GC but it's not "
-                                                            "found in the root set");
-                throw std::runtime_error("critical error");
-            }
-            SGC_DEBUG_LOG(std::format(
-                "removed destroyed root GcContainer {}",
-                reinterpret_cast<uintptr_t>(pDestroyedContainerRootNode)));
-        }
-        changes.destroyedGcContainerRootNodes.clear();
-
-        //
-        // Only after removing all destroyed nodes, add new ones.
-        //
-
-        // Add new GcPtr root nodes.
-        for (const auto pNewGcPtrRootNode : changes.newGcPtrRootNodes) {
-            mtxRootNodes.second.gcPtrRootNodes.insert(pNewGcPtrRootNode);
-            SGC_DEBUG_LOG(
-                std::format("added new root GcPtr {}", reinterpret_cast<uintptr_t>(pNewGcPtrRootNode)));
-        }
-        changes.newGcPtrRootNodes.clear();
-
-        // Add new GcContainer root nodes.
-        for (const auto pNewContainerRootNode : changes.newGcContainerRootNodes) {
-            mtxRootNodes.second.gcContainerRootNodes.insert(pNewContainerRootNode);
-            SGC_DEBUG_LOG(std::format(
-                "added new root GcContainer {}", reinterpret_cast<uintptr_t>(pNewContainerRootNode)));
-        }
-        changes.newGcContainerRootNodes.clear();
-
-#if defined(DEBUG)
-        static_assert(sizeof(PendingNodeGraphChanges) == 320, "consider applying new changes"); // NOLINT
-#endif
-    }
-
     size_t GarbageCollector::collectGarbage() {
-        // - Lock root nodes and allocations to make sure new allocations won't be created while we are
-        // collecting garbage.
-        // - Also lock pending nodes to make sure no root GcPtr will be destroyed (in the other thread) while
-        // we are here (since we will iterate over them).
+        // - Lock allocations to make sure new allocations won't be created while we are collecting garbage.
         // - GcPtr locks allocations when changing its pointer so we guarantee that no GcPtr will change
         // its pointer while we are in the GC (same thing with GcContainer).
-        // - Also no GC node will be destroyed while GC is running (since GcPtr and GcContainer
-        // lock GC mutex in destructor).
-        std::scoped_lock guard(mtxRootNodes.first, mtxAllocationData.first, mtxPendingNodeGraphChanges.first);
+        // - No GC node will be created/destroyed while GC is running (since GcPtr and GcContainer
+        // lock GC mutex in constructor/destructor).
+        //
+        // Lock both mutexes to avoid a deadlock.
+        std::scoped_lock guardAllocations(mtxAllocationData.first, mtxRootNodes.first);
 
         SGC_DEBUG_LOG("GC started");
-
-        // After locking mutexes apply pending changes.
-        applyPendingChanges();
 
         // Before running the "mark" step color every allocation in white
         // (to color only referenced allocations in black in the "mark" step).
@@ -281,16 +206,11 @@ namespace sgc {
         return mtxAllocationData.second.existingAllocations.size();
     }
 
-    std::pair<std::recursive_mutex, GarbageCollector::PendingNodeGraphChanges>*
-    GarbageCollector::getPendingNodeGraphChanges() {
-        return &mtxPendingNodeGraphChanges;
-    }
-
     std::pair<std::recursive_mutex, GarbageCollector::RootNodes>* GarbageCollector::getRootNodes() {
         return &mtxRootNodes;
     }
 
-    std::recursive_mutex* GarbageCollector::getGarbageCollectionMutex() { return &mtxAllocationData.first; }
+    std::recursive_mutex* GarbageCollector::getGcNodeGraphMutex() { return &mtxRootNodes.first; }
 
     bool GarbageCollector::onGcNodeConstructed(GcNode* pConstructedNode) {
         {
@@ -318,13 +238,13 @@ namespace sgc {
         // This node is not a field of some object.
 
         {
-            std::scoped_lock guard(mtxPendingNodeGraphChanges.first);
+            std::scoped_lock guard(mtxRootNodes.first);
 
             // Add this node as a new root node.
             if (const auto pGcContainerNode = dynamic_cast<GcContainerBase*>(pConstructedNode)) {
-                mtxPendingNodeGraphChanges.second.newGcContainerRootNodes.insert(pGcContainerNode);
+                mtxRootNodes.second.gcContainerRootNodes.insert(pGcContainerNode);
             } else if (const auto pGcPtrNode = dynamic_cast<GcPtrBase*>(pConstructedNode)) {
-                mtxPendingNodeGraphChanges.second.newGcPtrRootNodes.insert(pGcPtrNode);
+                mtxRootNodes.second.gcPtrRootNodes.insert(pGcPtrNode);
             } else [[unlikely]] {
                 GcInfoCallbacks::getCriticalErrorCallback()("found unexpected constructed node type");
                 throw std::runtime_error("critical error");
@@ -339,42 +259,25 @@ namespace sgc {
     }
 
     void GarbageCollector::onGcRootNodeBeingDestroyed(GcNode* pRootNode) {
-        std::scoped_lock guard(mtxPendingNodeGraphChanges.first);
+        std::scoped_lock guard(mtxRootNodes.first);
 
         if (const auto pGcContainerNode = dynamic_cast<GcContainerBase*>(pRootNode)) {
-            // First check if this root node still exists in the pending changes.
-            if (mtxPendingNodeGraphChanges.second.newGcContainerRootNodes.erase(pGcContainerNode) > 0) {
-                // Looks like this pointer was created and deleted in between garbage collections
-                // so removing it from the pending new root nodes is enough.
-                return;
+            if (mtxRootNodes.second.gcContainerRootNodes.erase(pGcContainerNode) != 1) [[unlikely]] {
+                // Something is wrong.
+                GcInfoCallbacks::getCriticalErrorCallback()(
+                    "GC container root node is being destroyed but it's not found in the root set");
+                throw std::runtime_error("critical error");
             }
-
-            // Add to destroyed root nodes.
-            mtxPendingNodeGraphChanges.second.destroyedGcContainerRootNodes.insert(pGcContainerNode);
         } else if (const auto pGcPtrNode = dynamic_cast<GcPtrBase*>(pRootNode)) {
-            // Same thing as above.
-            if (mtxPendingNodeGraphChanges.second.newGcPtrRootNodes.erase(pGcPtrNode) > 0) {
-                return;
+            if (mtxRootNodes.second.gcPtrRootNodes.erase(pGcPtrNode) != 1) [[unlikely]] {
+                // Something is wrong.
+                GcInfoCallbacks::getCriticalErrorCallback()(
+                    "GC pointer root node is being destroyed but it's not found in the root set");
+                throw std::runtime_error("critical error");
             }
-            mtxPendingNodeGraphChanges.second.destroyedGcPtrRootNodes.insert(pGcPtrNode);
         } else [[unlikely]] {
             GcInfoCallbacks::getCriticalErrorCallback()("found unexpected constructed node type");
             throw std::runtime_error("critical error");
         }
-    }
-
-    GarbageCollector::PendingNodeGraphChanges::PendingNodeGraphChanges() {
-        constexpr size_t iReservedCount = 512; // NOLINT: seems like a good starting capacity
-
-        // Reserve some space.
-        newGcPtrRootNodes.reserve(iReservedCount);
-        newGcContainerRootNodes.reserve(iReservedCount);
-        destroyedGcPtrRootNodes.reserve(iReservedCount);
-        destroyedGcContainerRootNodes.reserve(iReservedCount);
-
-#if defined(DEBUG)
-        static_assert(
-            sizeof(PendingNodeGraphChanges) == 320, "consider adding reserve to new fields"); // NOLINT
-#endif
     }
 }

@@ -22,7 +22,7 @@ namespace sgc {
     void GcPtrBase::onGcPtrBeingDestroyed() {
         // Make sure no GcPtr will be destroyed while garbage collection is running
         // otherwise GC might stumble upon deleted memory.
-        std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+        std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
         SGC_DEBUG_LOG(std::format(
             "GcPtr {} is being destroyed (is root node: {})",
@@ -42,9 +42,9 @@ namespace sgc {
             "(in the raw pointer) either: was previously not created from a \"make gc\" call or you tried "
             "casting to a non-first parent in a type that uses multiple inheritance (which is not supported)";
 
-        // Make sure we are not running a garbage collection.
+        // Acquire allocations data and make sure GC is not using node graph now.
         auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationData;
-        std::scoped_lock guard(mtxAllocationsData.first);
+        std::scoped_lock guard(mtxAllocationsData.first, *GarbageCollector::get().getGcNodeGraphMutex());
 
         SGC_DEBUG_LOG(std::format(
             "GcPtr {} set user object {}",

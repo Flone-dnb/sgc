@@ -20,40 +20,16 @@ TEST_CASE("object of child type in pointer of parent type counts as root node") 
         sgc::GcPtr<Child> pChild = sgc::makeGc<Child>();
         sgc::GcPtr<Parent> pParent = pChild;
 
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
             std::scoped_lock guard(pMtxRootNodes->first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
             REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
         }
 
-        // Apply changes.
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
-
-        // Check pending changes.
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-        }
 
         // Check root nodes.
         {
@@ -64,23 +40,19 @@ TEST_CASE("object of child type in pointer of parent type counts as root node") 
         }
     }
 
+    // Get root nodes.
+    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    {
+        std::scoped_lock guard(pMtxRootNodes->first);
+
+        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
+        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+    }
+
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 
-    // Get pending changes.
-    const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-    {
-        std::scoped_lock guard(pMtxPendingChanges->first);
-
-        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-
-        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-    }
-
-    // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    // Check root nodes.
     {
         std::scoped_lock guard(pMtxRootNodes->first);
 
@@ -141,18 +113,6 @@ TEST_CASE("object of child type in pointer of parent type using operator=") {
 
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 
-    // Get pending changes.
-    const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-    {
-        std::scoped_lock guard(pMtxPendingChanges->first);
-
-        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-
-        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-    }
-
     // Get root nodes.
     const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
@@ -211,18 +171,6 @@ TEST_CASE("object of child type in pointer of parent type using constructor") {
 
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 
-    // Get pending changes.
-    const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-    {
-        std::scoped_lock guard(pMtxPendingChanges->first);
-
-        REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-
-        REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-        REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-    }
-
     // Get root nodes.
     const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
@@ -249,18 +197,6 @@ TEST_CASE("sub gc ptr field offsets are correct") {
     };
 
     {
-        // Get pending changes.
-        const auto pMtxPendingChanges = sgc::GarbageCollector::get().getPendingNodeGraphChanges();
-        {
-            std::scoped_lock guard(pMtxPendingChanges->first);
-
-            REQUIRE(pMtxPendingChanges->second.newGcPtrRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcPtrRootNodes.empty());
-
-            REQUIRE(pMtxPendingChanges->second.newGcContainerRootNodes.empty());
-            REQUIRE(pMtxPendingChanges->second.destroyedGcContainerRootNodes.empty());
-        }
-
         // Get root nodes.
         const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {

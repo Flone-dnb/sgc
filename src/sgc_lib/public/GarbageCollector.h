@@ -26,41 +26,6 @@ namespace sgc {
         friend class GcAllocation;
 
     public:
-        /**
-         * Stores pending changes that occur between garbage collections and that need to be "applied"
-         * to the data that GarbageCollector stores.
-         *
-         * @remark We don't apply changes to GC nodes immediately for several reasons, for example
-         * when inside a garbage collection we delete (free) some object we might cause GC nodes
-         * to be destroyed which might cause GC node graph to be modified (while we are iterating over it)
-         * which is undesirable.
-         */
-        struct PendingNodeGraphChanges {
-            PendingNodeGraphChanges();
-
-            /**
-             * Destructed GC pointers that were root nodes, GC pointers add themselves to this array in their
-             * destructor.
-             *
-             * @warning Pointers in this array point to deleted memory.
-             */
-            std::unordered_set<const GcPtrBase*> destroyedGcPtrRootNodes;
-
-            /** Newly created GC pointers that should be added to GC node graph as root nodes. */
-            std::unordered_set<const GcPtrBase*> newGcPtrRootNodes;
-
-            /**
-             * Destructed GC containers that were root nodes, GC containers add themselves to this array in
-             * their destructor.
-             *
-             * @warning Pointers in this array point to deleted memory.
-             */
-            std::unordered_set<const GcContainerBase*> destroyedGcContainerRootNodes;
-
-            /** Newly created GC containers that should be added to GC node graph as root nodes. */
-            std::unordered_set<const GcContainerBase*> newGcContainerRootNodes;
-        };
-
         /** Groups various GC root nodes. */
         struct RootNodes {
             /** GcPtr nodes in the root set of the garbage collector's node graph. */
@@ -99,19 +64,6 @@ namespace sgc {
         size_t getAliveAllocationCount();
 
         /**
-         * Returns pointer to read-only data of the garbage collector's internal "pending changes" set.
-         *
-         * @warning Do not delete (free) returned pointer or modify the pending changes set.
-         *
-         * @warning Only use with returned mutex.
-         *
-         * @remark Used for automated tests and debugging.
-         *
-         * @return Pending changes to node graph.
-         */
-        std::pair<std::recursive_mutex, PendingNodeGraphChanges>* getPendingNodeGraphChanges();
-
-        /**
          * Returns pointer to read-only data of the garbage collector's internal root node set.
          *
          * @warning Do not delete (free) returned pointer or modify the root node set.
@@ -125,13 +77,14 @@ namespace sgc {
         std::pair<std::recursive_mutex, RootNodes>* getRootNodes();
 
         /**
-         * Returns mutex that's locked while the garbage collection is running.
+         * Returns mutex that's locked while the garbage collector is running through GC node graph
+         * (during garbage collection's first phase).
          *
          * @warning Do not delete (free) returned pointer.
          *
          * @return Mutex.
          */
-        std::recursive_mutex* getGarbageCollectionMutex();
+        std::recursive_mutex* getGcNodeGraphMutex();
 
     private:
         /** Groups mutex guarded data controlled by GC allocations. */
@@ -174,12 +127,6 @@ namespace sgc {
          * @param pRootNode GC pointer or a GC container that was a root node.
          */
         void onGcRootNodeBeingDestroyed(GcNode* pRootNode);
-
-        /** Applies pending changes from @ref mtxPendingNodeGraphChanges. */
-        void applyPendingChanges();
-
-        /** Pending changes to the node graph. */
-        std::pair<std::recursive_mutex, PendingNodeGraphChanges> mtxPendingNodeGraphChanges;
 
         /** Info about GC allocations. */
         std::pair<std::recursive_mutex, AllocationData> mtxAllocationData;

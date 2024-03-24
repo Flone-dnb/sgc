@@ -57,7 +57,9 @@ namespace sgc {
         template <typename Type, typename... ConstructorArgs>
         inline void* initializeFromNewAllocation(ConstructorArgs&&... constructorArgs) {
             // Make sure we are not running a garbage collection while creating a new allocation.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(
+                *GarbageCollector::get().getGcNodeGraphMutex(),
+                GarbageCollector::get().mtxAllocationData.first);
 
             SGC_DEBUG_LOG(
                 std::format("GcPtr {} started creating a new allocation", reinterpret_cast<uintptr_t>(this)));

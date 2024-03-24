@@ -43,7 +43,7 @@ namespace sgc {
          */
         GcVector(const GcVector& vOther) : GcContainerBase(iterateOverGcPtrItems) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData = vOther.vData;
         }
@@ -55,7 +55,7 @@ namespace sgc {
          */
         GcVector(GcVector&& vOther) noexcept : GcContainerBase(iterateOverGcPtrItems) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData = std::move(vOther.vData);
         }
@@ -69,7 +69,7 @@ namespace sgc {
         explicit GcVector(size_t iCount, const vec_item_t& value = vec_item_t())
             : GcContainerBase(iterateOverGcPtrItems) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData = std::vector<vec_item_t>(iCount, value);
         }
@@ -83,7 +83,7 @@ namespace sgc {
          */
         GcVector& operator=(const GcVector& vOther) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData = vOther.vData;
 
@@ -99,7 +99,7 @@ namespace sgc {
          */
         GcVector& operator=(GcVector&& vOther) noexcept {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData = std::move(vOther.vData);
 
@@ -269,7 +269,7 @@ namespace sgc {
          */
         inline void reserve(size_t iSize) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.reserve(iSize);
         }
@@ -284,7 +284,7 @@ namespace sgc {
         /** Reduces memory usage by freeing unused memory. */
         inline void shrink_to_fit() { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.shrink_to_fit();
         }
@@ -292,7 +292,7 @@ namespace sgc {
         /** Erases all elements from the container. */
         inline void clear() {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.clear();
         }
@@ -305,7 +305,7 @@ namespace sgc {
          */
         inline void insert(std::vector<vec_item_t>::iterator pos, const vec_item_t& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.insert(pos, value);
         }
@@ -318,7 +318,7 @@ namespace sgc {
          */
         inline void insert(std::vector<vec_item_t>::iterator pos, vec_item_t&& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.insert(pos, std::forward<vec_item_t>(value));
         }
@@ -331,7 +331,7 @@ namespace sgc {
          */
         inline void insert(std::vector<vec_item_t>::const_iterator pos, const vec_item_t& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.insert(pos, value);
         }
@@ -344,7 +344,7 @@ namespace sgc {
          */
         inline void insert(std::vector<vec_item_t>::const_iterator pos, vec_item_t&& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.insert(pos, std::forward<vec_item_t>(value));
         }
@@ -358,7 +358,7 @@ namespace sgc {
          */
         inline std::vector<vec_item_t>::iterator erase(std::vector<vec_item_t>::iterator pos) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             return vData.erase(pos);
         }
@@ -372,7 +372,7 @@ namespace sgc {
          */
         inline std::vector<vec_item_t>::iterator erase(std::vector<vec_item_t>::const_iterator pos) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             return vData.erase(pos);
         }
@@ -388,7 +388,7 @@ namespace sgc {
         inline std::vector<vec_item_t>::iterator
         erase(std::vector<vec_item_t>::iterator first, std::vector<vec_item_t>::iterator last) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             return vData.erase(first, last);
         }
@@ -404,7 +404,7 @@ namespace sgc {
         inline std::vector<vec_item_t>::iterator
         erase(std::vector<vec_item_t>::const_iterator first, std::vector<vec_item_t>::const_iterator last) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             return vData.erase(first, last);
         }
@@ -416,7 +416,7 @@ namespace sgc {
          */
         inline void push_back(const vec_item_t& valueToAdd) { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.push_back(valueToAdd);
         }
@@ -428,7 +428,7 @@ namespace sgc {
          */
         inline void push_back(vec_item_t&& valueToAdd) { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.push_back(std::forward<vec_item_t>(valueToAdd));
         }
@@ -443,7 +443,7 @@ namespace sgc {
         template <class... Args>
         inline vec_item_t& emplace_back(Args&&... args) { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             return vData.emplace_back(std::forward<Args>(args)...);
         }
@@ -451,7 +451,7 @@ namespace sgc {
         /** Removes the last element of the container. */
         inline void pop_back() { // NOLINT: use name style as STL
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.pop_back();
         }
@@ -463,7 +463,7 @@ namespace sgc {
          */
         inline void resize(size_t iCount) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.resize(iCount);
         }
@@ -476,7 +476,7 @@ namespace sgc {
          */
         inline void resize(size_t iCount, const vec_item_t& value) {
             // Make sure the GC is not currently iterating over this container since we modify the container.
-            std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
+            std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
 
             vData.resize(iCount, value);
         }
