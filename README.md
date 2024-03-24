@@ -82,6 +82,7 @@ assert(pFoo == nullptr);
 Most of the cases listed below trigger a critical error message so even if you forget about something you will be notified as long as you bind to GC callbacks.
 
 - `GcPtr` objects can only hold objects that were allocated using `makeGc` calls
+
 ```Cpp
 sgc::GcPtr<Foo> pFoo1 = sgc::GcPtr<Foo>(new Foo()); // critical error
 sgc::GcPtr<Foo> pFoo2 = new Foo(); // also critical error
@@ -92,6 +93,7 @@ sgc::GcPtr<Foo> pAnotherGcFoo = pRawFoo; // perfectly valid since `Foo` object w
 ```
 
 - `GcPtr` objects can fail when holding objects of types that use multiple inheritance
+
 ```Cpp
 class MultiChild : public Parent1, public Parent2 { /* ... */ };
 
@@ -164,7 +166,7 @@ pOuterFoo->mtxSomeFoo.second = sgc::makeGc<Foo>(); // this inner `Foo` is marked
 
 # Thread safety
 
-- You CAN modify the same `GcPtr` object simultaneously from multiple threads. Note, we are talking about `GcPtr` object, not about its inner allocation that it's pointing to. For example:
+- You can modify the same `GcPtr` object simultaneously from multiple threads. Note, we are talking about `GcPtr` object, not about its inner allocation that it's pointing to. For example:
 
 ```Cpp
 sgc::GcPtr<Foo> pFoo = sgc::makeGc<Foo>();
@@ -176,7 +178,7 @@ std::move(pFoo);     |  pFoo = sgc::makeGc<Foo>(); // `GcPtr` has some synchroni
 // ----------------- | -------------------         // you will just copy `GcPtr` object into another thread
 ```
 
-- You CAN call garbage collection from a non-main thread.
+- You can call garbage collection from a non-main thread.
 
 - Avoid situations when no `GcPtr` object is pointing to your `makeGc` allocated object to pass it somewhere else, for example:
 
