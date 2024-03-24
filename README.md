@@ -202,6 +202,32 @@ GcPtr<Foo> pAnotherFoo = pRawFoo; // now 2 `GcPtr` objects reference `Foo`
 pGcFoo = nullptr; // now just 1 `GcPtr` object references `Foo`
 ```
 
+- Don't synchronously wait for another thread that operates with GC entities in the constructor/destructor of your GC-controlled type (talking only about constructor and destructor, other functions are fine), for example:
+
+```Cpp
+class Foo {
+public:
+    Foo() {
+        const auto pPromise = std::make_shared<std::promise<bool>>();
+        auto future = pPromise->get_future();
+
+        addThread([pPromise]() {
+            const auto pOther = sgc::makeGc<...>(); // or any other GC operation (will cause a deadlock here)
+
+            pPromise->set_value(true);
+        });
+
+        future.get(); // this will cause a deadlock because we're in constructor of GC-controlled type
+    }
+
+    ~Foo() {
+        // same thing here, copy-paste code from constructor and a deadlock will occur here
+    }
+};
+
+const auto pFoo = sgc::makeGc<Foo>();
+```
+
 # Examples of storing GC pointers in various places
 
 Here are some typical `GcPtr` use-cases where you might ask "is this OK?" and the answer is "yes":
