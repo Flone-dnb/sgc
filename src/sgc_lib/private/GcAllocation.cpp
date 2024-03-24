@@ -18,11 +18,6 @@ namespace sgc {
         // Add self and allocation info.
         mtxAllocationsInfo.existingAllocations.insert(this);
         mtxAllocationsInfo.allocationInfoRefs[getAllocationInfo()] = this;
-#if defined(DEBUG)
-        static_assert(
-            sizeof(GarbageCollector::AllocationData) == 160, // NOLINT
-            "consider inserting new data");
-#endif
     }
 
     GcAllocation::~GcAllocation() {

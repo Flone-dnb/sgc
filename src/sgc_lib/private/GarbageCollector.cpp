@@ -1,5 +1,8 @@
 #include "GarbageCollector.h"
 
+// Standard.
+#include <stdexcept>
+
 // Custom.
 #include "GcAllocation.h"
 #include "GcTypeInfo.h"
@@ -182,12 +185,6 @@ namespace sgc {
                     "GC allocation failed to find its allocation info (to be "
                     "erased) in the array of existing allocation info objects");
             }
-
-#if defined(DEBUG)
-            static_assert(
-                sizeof(GarbageCollector::AllocationData) == 160, // NOLINT
-                "consider erasing new data");
-#endif
 
             // Delete (free) the allocation.
             delete pAllocation;

@@ -124,7 +124,7 @@ namespace sgc {
         GcPtr() : GcPtrBase(bCanBeRootNode) {}
 
         /** Constructs an empty (`nullptr`) pointer. */
-        GcPtr(nullptr_t) : GcPtrBase(bCanBeRootNode) {}
+        GcPtr(std::nullptr_t) : GcPtrBase(bCanBeRootNode) {}
 
         /**
          * Constructs a GC pointer from a raw pointer.
@@ -508,8 +508,8 @@ namespace sgc {
         GcPtr<Type> pGcPtr;
 
         // Register a new allocation and set it to the pointer.
-        const auto pObject =
-            pGcPtr.initializeFromNewAllocation<Type>(std::forward<ConstructorArgs>(constructorArgs)...);
+        const auto pObject = pGcPtr.template initializeFromNewAllocation<Type>(
+            std::forward<ConstructorArgs>(constructorArgs)...);
 
 #if defined(DEBUG)
         // Save pointer to the object for debugging.

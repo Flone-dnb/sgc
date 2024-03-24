@@ -1,5 +1,8 @@
 #include "GcPtr.h"
 
+// Standard.
+#include <stdexcept>
+
 // Custom.
 #include "GarbageCollector.h"
 #include "GcInfoCallbacks.hpp"
