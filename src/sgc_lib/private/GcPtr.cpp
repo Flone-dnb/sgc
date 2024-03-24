@@ -22,7 +22,7 @@ namespace sgc {
     void GcPtrBase::onGcPtrBeingDestroyed() {
         // Make sure no GcPtr will be destroyed while garbage collection is running
         // otherwise GC might stumble upon deleted memory.
-        std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
+        std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
         SGC_DEBUG_LOG(std::format(
             "GcPtr {} is being destroyed (is root node: {})",
@@ -43,8 +43,8 @@ namespace sgc {
             "casting to a non-first parent in a type that uses multiple inheritance (which is not supported)";
 
         // Acquire allocations data and make sure GC is not using node graph now.
-        auto& mtxAllocationsData = GarbageCollector::get().mtxAllocationData;
-        std::scoped_lock guard(mtxAllocationsData.first, *GarbageCollector::get().getGcNodeGraphMutex());
+        std::scoped_lock guard(GarbageCollector::get().mtxGcData.first);
+        auto& allocationInfos = GarbageCollector::get().mtxGcData.second.allocationData.allocationInfoRefs;
 
         SGC_DEBUG_LOG(std::format(
             "GcPtr {} set user object {}",
@@ -74,7 +74,6 @@ namespace sgc {
             reinterpret_cast<char*>(pUserObject) - static_cast<uintptr_t>(iAllocationInfoSize));
 
         // Find this allocation in the garbage collector's "database" to make sure the pointer is valid.
-        auto& allocationInfos = mtxAllocationsData.second.allocationInfoRefs;
         const auto allocationInfoIt = allocationInfos.find(pNewAllocationInfo);
         if (allocationInfoIt == allocationInfos.end()) [[unlikely]] {
             // Not a valid GC object.

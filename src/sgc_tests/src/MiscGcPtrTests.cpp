@@ -42,12 +42,12 @@ TEST_CASE("passed construction arguments to make gc are passed to type construct
 
     {
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         auto pFoo1 = sgc::makeGc<Foo>();
@@ -93,12 +93,12 @@ TEST_CASE("gc allocations are destroyed only while collecting garbage") {
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 
     // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 
     {
@@ -115,10 +115,10 @@ TEST_CASE("gc allocations are destroyed only while collecting garbage") {
 
     // Check root nodes.
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 }
 
@@ -132,12 +132,12 @@ TEST_CASE("GC solves cyclic references (ref created outside constructor") {
         auto pFoo = sgc::makeGc<Foo>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         // Create cyclic ref.
@@ -145,10 +145,10 @@ TEST_CASE("GC solves cyclic references (ref created outside constructor") {
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
@@ -169,12 +169,12 @@ TEST_CASE("GC solves cyclic references (ref created inside constructor") {
         REQUIRE(pFoo->pFoo != nullptr);
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
@@ -195,13 +195,13 @@ TEST_CASE("use makeGc to create a GcPtr root node") {
         auto pFoo = sgc::makeGc<Foo>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE((*pMtxRootNodes->second.gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE((*mtxRootNodes.second->gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         // Run GC to apply the changes.
@@ -212,11 +212,11 @@ TEST_CASE("use makeGc to create a GcPtr root node") {
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
             // There should only be 1 root node.
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE((*pMtxRootNodes->second.gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE((*mtxRootNodes.second->gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
         }
 
         // Clear inner.
@@ -227,24 +227,24 @@ TEST_CASE("use makeGc to create a GcPtr root node") {
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
             // There should only be our node (because GcPtr object still exists).
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE((*pMtxRootNodes->second.gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE((*mtxRootNodes.second->gcPtrRootNodes.begin())->getUserObject() == pFoo.get());
         }
     }
 
     // Scope ended and pFoo and pInner were destroyed.
 
     // Check root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
         // There should still be our node.
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 
     // Run GC to apply pending changes (Foo should be deleted).
@@ -252,11 +252,11 @@ TEST_CASE("use makeGc to create a GcPtr root node") {
 
     // Check root nodes.
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
         // All empty.
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 }
 
@@ -308,12 +308,12 @@ TEST_CASE("constructing gc pointer to this from raw pointer is valid") {
             REQUIRE(bConstructorCalled);
 
             // Get root nodes.
-            const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+            const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
             {
-                std::scoped_lock guard(pMtxRootNodes->first);
+                std::scoped_lock guard(*mtxRootNodes.first);
 
-                REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
-                REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+                REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 2);
+                REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
             }
 
             REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
@@ -322,12 +322,12 @@ TEST_CASE("constructing gc pointer to this from raw pointer is valid") {
         }
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
@@ -335,10 +335,10 @@ TEST_CASE("constructing gc pointer to this from raw pointer is valid") {
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
@@ -465,12 +465,12 @@ TEST_CASE("gc pointer outer object that stores inner object with a gc field does
         pOuter->inner.pCollected = sgc::makeGc<Collected>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         // There should be 2 child nodes.
@@ -507,12 +507,12 @@ TEST_CASE("shared pointer outer object that stores inner object with a gc field 
         pOuter->inner.pCollected = sgc::makeGc<Collected>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
@@ -546,12 +546,12 @@ TEST_CASE("unique pointer outer object that stores inner object with a gc field 
         pOuter->inner.pCollected = sgc::makeGc<Collected>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
@@ -617,24 +617,24 @@ TEST_CASE("create and destroy gc pointer between gc collection") {
         auto pFoo = sgc::makeGc<Foo>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     } // pFoo destroyed here
 
     // don't apply pending changes yet
 
     // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
@@ -658,12 +658,12 @@ TEST_CASE("call make gc in constructor of gc pointer") {
         auto pFoo = sgc::makeGc<Foo>();
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 2);
@@ -686,12 +686,12 @@ TEST_CASE("capture gc pointer in global lambda (without cyclic ref) does not cau
         pFoo->iValue = 1;
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
@@ -703,20 +703,20 @@ TEST_CASE("capture gc pointer in global lambda (without cyclic ref) does not cau
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 2);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         callback();
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 2);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
@@ -739,22 +739,22 @@ TEST_CASE("capture gc pointer in lambda to create a cyclic reference that leaks 
         pLeakedFoo = pFoo.get(); // save raw pointer to use later
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 2);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     } // pFoo is destroyed here but not Foo object
 
     // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
@@ -762,10 +762,10 @@ TEST_CASE("capture gc pointer in lambda to create a cyclic reference that leaks 
 
     // Check root nodes.
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 
     // Clear lambda.
@@ -776,10 +776,10 @@ TEST_CASE("capture gc pointer in lambda to create a cyclic reference that leaks 
 
     // Check root nodes.
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 }
 
@@ -854,12 +854,12 @@ TEST_CASE("benchmark garbage collection") {
         }
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 10011);

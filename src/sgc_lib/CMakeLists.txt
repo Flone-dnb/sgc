@@ -82,7 +82,7 @@ enable_doxygen(${CMAKE_CURRENT_SOURCE_DIR}/../../docs)
 #                                       DEPENDENCIES
 # -------------------------------------------------------------------------------------------------
 
-if (OFF) # change to enable debug logging for debugging
+if (OFF) # change to `ON` to enable debug logging while debugging
     message(WARNING "debug logging is enabled")
 
     # External: spdlog.

@@ -8,16 +8,16 @@ namespace sgc {
     GcAllocation::GcAllocation(void* pAllocatedMemory, GcTypeInfo* pTypeInfo)
         : pAllocatedMemory(pAllocatedMemory), pTypeInfo(pTypeInfo) {
         // Get allocations info.
-        auto& mtxAllocationsInfo = GarbageCollector::get().mtxAllocationData;
-        std::scoped_lock guard(mtxAllocationsInfo.first);
+        std::scoped_lock guard(GarbageCollector::get().mtxGcData.first);
+        auto& mtxAllocationsInfo = GarbageCollector::get().mtxGcData.second.allocationData;
 
         SGC_DEBUG_LOG(std::format(
             "GcAllocation() with user object {} being constructed",
             reinterpret_cast<uintptr_t>(getAllocatedObject())));
 
         // Add self and allocation info.
-        mtxAllocationsInfo.second.existingAllocations.insert(this);
-        mtxAllocationsInfo.second.allocationInfoRefs[getAllocationInfo()] = this;
+        mtxAllocationsInfo.existingAllocations.insert(this);
+        mtxAllocationsInfo.allocationInfoRefs[getAllocationInfo()] = this;
 #if defined(DEBUG)
         static_assert(
             sizeof(GarbageCollector::AllocationData) == 160, // NOLINT

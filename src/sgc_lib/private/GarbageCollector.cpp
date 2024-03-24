@@ -20,21 +20,20 @@ namespace sgc {
     }
 
     size_t GarbageCollector::collectGarbage() {
-        // - Lock allocations to make sure new allocations won't be created while we are collecting garbage.
-        // - GcPtr locks allocations when changing its pointer so we guarantee that no GcPtr will change
+        // - Lock mutex to make sure new allocations won't be created while we are collecting garbage.
+        // - GcPtr locks mutex when changing its pointer so we guarantee that no GcPtr will change
         // its pointer while we are in the GC (same thing with GcContainer).
         // - No GC node will be created/destroyed while GC is running (since GcPtr and GcContainer
         // lock GC mutex in constructor/destructor).
-        //
-        // Lock both mutexes to avoid a deadlock.
-        std::scoped_lock guardAllocations(mtxAllocationData.first, mtxRootNodes.first);
+        std::scoped_lock guardAllocations(mtxGcData.first);
 
         SGC_DEBUG_LOG("GC started");
 
         // Before running the "mark" step color every allocation in white
         // (to color only referenced allocations in black in the "mark" step).
-        auto& allocations = mtxAllocationData.second.existingAllocations;
-        for (auto allocationIt = allocations.begin(); allocationIt != allocations.end(); ++allocationIt) {
+        auto& existingAllocations = mtxGcData.second.allocationData.existingAllocations;
+        for (auto allocationIt = existingAllocations.begin(); allocationIt != existingAllocations.end();
+             ++allocationIt) {
             (*allocationIt)->getAllocationInfo()->color = GcAllocationColor::WHITE;
         }
 
@@ -107,7 +106,7 @@ namespace sgc {
         };
 
         // Start marking phase from root GcPtr nodes.
-        auto& rootSet = mtxRootNodes.second;
+        auto& rootSet = mtxGcData.second.rootNodes;
         for (auto ptrIt = rootSet.gcPtrRootNodes.begin(); ptrIt != rootSet.gcPtrRootNodes.end(); ++ptrIt) {
             // Make sure this GcPtr points to a valid allocation.
             const auto pGcPtr = *ptrIt;
@@ -164,8 +163,7 @@ namespace sgc {
 
         // Now do the "sweep" phase.
         size_t iDeletedObjectCount = 0;
-        for (auto allocationIt = mtxAllocationData.second.existingAllocations.begin();
-             allocationIt != mtxAllocationData.second.existingAllocations.end();) {
+        for (auto allocationIt = existingAllocations.begin(); allocationIt != existingAllocations.end();) {
             // Check allocation color.
             const auto pAllocation = *allocationIt;
             if (pAllocation->getAllocationInfo()->color != GcAllocationColor::WHITE) {
@@ -175,11 +173,11 @@ namespace sgc {
             }
 
             // Remove the allocation (update our iterator).
-            allocationIt = mtxAllocationData.second.existingAllocations.erase(allocationIt);
+            allocationIt = existingAllocations.erase(allocationIt);
 
             // Remove the allocation's info.
-            if (mtxAllocationData.second.allocationInfoRefs.erase(pAllocation->getAllocationInfo()) != 1)
-                [[unlikely]] {
+            if (mtxGcData.second.allocationData.allocationInfoRefs.erase(pAllocation->getAllocationInfo()) !=
+                1) [[unlikely]] {
                 GcInfoCallbacks::getWarningCallback()(
                     "GC allocation failed to find its allocation info (to be "
                     "erased) in the array of existing allocation info objects");
@@ -202,15 +200,15 @@ namespace sgc {
     }
 
     size_t GarbageCollector::getAliveAllocationCount() {
-        std::scoped_lock guard(mtxAllocationData.first);
-        return mtxAllocationData.second.existingAllocations.size();
+        std::scoped_lock guard(mtxGcData.first);
+        return mtxGcData.second.allocationData.existingAllocations.size();
     }
 
-    std::pair<std::recursive_mutex, GarbageCollector::RootNodes>* GarbageCollector::getRootNodes() {
-        return &mtxRootNodes;
+    std::pair<std::recursive_mutex*, GarbageCollector::RootNodes*> GarbageCollector::getRootNodes() {
+        return std::make_pair(&mtxGcData.first, &mtxGcData.second.rootNodes);
     }
 
-    std::recursive_mutex* GarbageCollector::getGcNodeGraphMutex() { return &mtxRootNodes.first; }
+    std::recursive_mutex* GarbageCollector::getGarbageCollectionMutex() { return &mtxGcData.first; }
 
     bool GarbageCollector::onGcNodeConstructed(GcNode* pConstructedNode) {
         {
@@ -238,13 +236,15 @@ namespace sgc {
         // This node is not a field of some object.
 
         {
-            std::scoped_lock guard(mtxRootNodes.first);
+            std::scoped_lock guard(mtxGcData.first);
+
+            auto& rootSet = mtxGcData.second.rootNodes;
 
             // Add this node as a new root node.
             if (const auto pGcContainerNode = dynamic_cast<GcContainerBase*>(pConstructedNode)) {
-                mtxRootNodes.second.gcContainerRootNodes.insert(pGcContainerNode);
+                rootSet.gcContainerRootNodes.insert(pGcContainerNode);
             } else if (const auto pGcPtrNode = dynamic_cast<GcPtrBase*>(pConstructedNode)) {
-                mtxRootNodes.second.gcPtrRootNodes.insert(pGcPtrNode);
+                rootSet.gcPtrRootNodes.insert(pGcPtrNode);
             } else [[unlikely]] {
                 GcInfoCallbacks::getCriticalErrorCallback()("found unexpected constructed node type");
                 throw std::runtime_error("critical error");
@@ -259,17 +259,19 @@ namespace sgc {
     }
 
     void GarbageCollector::onGcRootNodeBeingDestroyed(GcNode* pRootNode) {
-        std::scoped_lock guard(mtxRootNodes.first);
+        std::scoped_lock guard(mtxGcData.first);
+
+        auto& rootSet = mtxGcData.second.rootNodes;
 
         if (const auto pGcContainerNode = dynamic_cast<GcContainerBase*>(pRootNode)) {
-            if (mtxRootNodes.second.gcContainerRootNodes.erase(pGcContainerNode) != 1) [[unlikely]] {
+            if (rootSet.gcContainerRootNodes.erase(pGcContainerNode) != 1) [[unlikely]] {
                 // Something is wrong.
                 GcInfoCallbacks::getCriticalErrorCallback()(
                     "GC container root node is being destroyed but it's not found in the root set");
                 throw std::runtime_error("critical error");
             }
         } else if (const auto pGcPtrNode = dynamic_cast<GcPtrBase*>(pRootNode)) {
-            if (mtxRootNodes.second.gcPtrRootNodes.erase(pGcPtrNode) != 1) [[unlikely]] {
+            if (rootSet.gcPtrRootNodes.erase(pGcPtrNode) != 1) [[unlikely]] {
                 // Something is wrong.
                 GcInfoCallbacks::getCriticalErrorCallback()(
                     "GC pointer root node is being destroyed but it's not found in the root set");

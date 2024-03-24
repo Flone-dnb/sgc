@@ -13,7 +13,7 @@ namespace sgc {
 
     void GcContainerBase::notifyGarbageCollectorAboutDestruction() {
         // Make sure the GC has finished iterating over the container.
-        std::scoped_lock guard(*GarbageCollector::get().getGcNodeGraphMutex());
+        std::scoped_lock guard(*GarbageCollector::get().getGarbageCollectionMutex());
 
         if (isRootNode()) {
             // Notify garbage collector.

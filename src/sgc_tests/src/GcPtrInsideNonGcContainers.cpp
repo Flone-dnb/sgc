@@ -22,12 +22,12 @@ TEST_CASE("storing gc pointer in std::pair does not cause leaks") {
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         // Set valid value.
@@ -37,11 +37,11 @@ TEST_CASE("storing gc pointer in std::pair does not cause leaks") {
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
             // only `pFoo` is root node, while the one in the pair is a child node
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
@@ -62,12 +62,12 @@ TEST_CASE("storing gc pointer in std::array does not cause leaks") {
         REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 1);
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         // Set valid value.
@@ -77,11 +77,11 @@ TEST_CASE("storing gc pointer in std::array does not cause leaks") {
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
             // only `pFoo` is root node, while the one in the array is a child node
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 1);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 1);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 

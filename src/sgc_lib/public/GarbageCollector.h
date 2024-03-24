@@ -66,7 +66,7 @@ namespace sgc {
         /**
          * Returns pointer to read-only data of the garbage collector's internal root node set.
          *
-         * @warning Do not delete (free) returned pointer or modify the root node set.
+         * @warning Do not delete (free) returned pointer or modify returned data.
          *
          * @warning Only use with returned mutex.
          *
@@ -74,20 +74,19 @@ namespace sgc {
          *
          * @return Root nodes in the node graph.
          */
-        std::pair<std::recursive_mutex, RootNodes>* getRootNodes();
+        std::pair<std::recursive_mutex*, RootNodes*> getRootNodes();
 
         /**
-         * Returns mutex that's locked while the garbage collector is running through GC node graph
-         * (during garbage collection's first phase).
+         * Returns mutex that's locked while the garbage collection is running.
          *
          * @warning Do not delete (free) returned pointer.
          *
          * @return Mutex.
          */
-        std::recursive_mutex* getGcNodeGraphMutex();
+        std::recursive_mutex* getGarbageCollectionMutex();
 
     private:
-        /** Groups mutex guarded data controlled by GC allocations. */
+        /** Groups data about GC allocations. */
         struct AllocationData {
             /**
              * All not deleted (in-use) allocations allocated by the garbage collector.
@@ -105,6 +104,15 @@ namespace sgc {
              * existingAllocations.
              */
             std::unordered_map<GcAllocationInfo*, GcAllocation*> allocationInfoRefs;
+        };
+
+        /** Groups mutex guarded data used by GC. */
+        struct GarbageCollectionData {
+            /** Root nodes in GC node graph. */
+            RootNodes rootNodes;
+
+            /** Info about allocations. */
+            AllocationData allocationData;
         };
 
         GarbageCollector();
@@ -128,11 +136,8 @@ namespace sgc {
          */
         void onGcRootNodeBeingDestroyed(GcNode* pRootNode);
 
-        /** Info about GC allocations. */
-        std::pair<std::recursive_mutex, AllocationData> mtxAllocationData;
-
-        /** Nodes in the root set of the garbage collector's node graph. */
-        std::pair<std::recursive_mutex, RootNodes> mtxRootNodes;
+        /** Used by GC data */
+        std::pair<std::recursive_mutex, GarbageCollectionData> mtxGcData;
 
         /**
          * Stores GC allocated objects currently being constructed (allocated).

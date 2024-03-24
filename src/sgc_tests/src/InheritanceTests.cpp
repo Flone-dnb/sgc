@@ -21,32 +21,32 @@ TEST_CASE("object of child type in pointer of parent type counts as root node") 
         sgc::GcPtr<Parent> pParent = pChild;
 
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 2);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
 
         REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 0);
 
         // Check root nodes.
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.size() == 2);
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.size() == 2);
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
     // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 
     REQUIRE(sgc::GarbageCollector::get().collectGarbage() == 1);
@@ -54,10 +54,10 @@ TEST_CASE("object of child type in pointer of parent type counts as root node") 
 
     // Check root nodes.
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 }
 
@@ -114,12 +114,12 @@ TEST_CASE("object of child type in pointer of parent type using operator=") {
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 
     // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 }
 
@@ -172,12 +172,12 @@ TEST_CASE("object of child type in pointer of parent type using constructor") {
     REQUIRE(sgc::GarbageCollector::get().getAliveAllocationCount() == 0);
 
     // Get root nodes.
-    const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+    const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
     {
-        std::scoped_lock guard(pMtxRootNodes->first);
+        std::scoped_lock guard(*mtxRootNodes.first);
 
-        REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-        REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+        REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
     }
 }
 
@@ -198,12 +198,12 @@ TEST_CASE("sub gc ptr field offsets are correct") {
 
     {
         // Get root nodes.
-        const auto pMtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
+        const auto mtxRootNodes = sgc::GarbageCollector::get().getRootNodes();
         {
-            std::scoped_lock guard(pMtxRootNodes->first);
+            std::scoped_lock guard(*mtxRootNodes.first);
 
-            REQUIRE(pMtxRootNodes->second.gcPtrRootNodes.empty());
-            REQUIRE(pMtxRootNodes->second.gcContainerRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcPtrRootNodes.empty());
+            REQUIRE(mtxRootNodes.second->gcContainerRootNodes.empty());
         }
     }
 
