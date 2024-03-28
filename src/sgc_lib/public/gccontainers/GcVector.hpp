@@ -15,7 +15,7 @@ namespace sgc {
      * @tparam OuterType `GcPtr`.
      * @tparam InnerType Type that `GcPtr`s of this container will store.
      */
-    template <typename OuterType, typename InnerType = typename OuterType::value_type>
+    template <typename OuterType, typename InnerType = typename OuterType::element_type>
         requires(std::same_as<OuterType, GcPtr<InnerType, true>> ||   // only GcPtr items are supported
                  std::same_as<OuterType, GcPtr<InnerType, false>>) && //
                 (!std::derived_from<InnerType, GcContainerBase>)      // inner containers not supported

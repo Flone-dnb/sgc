@@ -112,7 +112,7 @@ namespace sgc {
 
     public:
         /** Used by GC containers. */
-        using value_type = Type;
+        using element_type = Type;
 
         virtual ~GcPtr() override { onGcPtrBeingDestroyed(); }
 
