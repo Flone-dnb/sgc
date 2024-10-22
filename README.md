@@ -304,6 +304,7 @@ You can find more examples in the directory `src/sgc_tests/src`.
 In your cmake file:
 
 ```cmake
+set(SGC_GENERATE_DOCS OFF CACHE BOOL "" FORCE)
 set(SGC_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(<some path here>/sgc SYSTEM)
 target_link_libraries(${PROJECT_NAME} PUBLIC sgc_lib)
@@ -359,6 +360,12 @@ To update this repository:
 git pull
 git submodule update --init --recursive
 ```
+
+# Debugging
+
+`sgc_lib` has debug logging functionality that logs "every step" of the GC work. This logging might be useful for debugging multithreading issues.
+
+To enable debug logging change `OFF` to `ON` in `sgc_lib`'s CMakeLists.txt where it says about debug logging. This will enable the `DebugLogger` class.
 
 # Documentation
 

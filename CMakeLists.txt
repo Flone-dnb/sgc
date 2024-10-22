@@ -4,6 +4,7 @@ project(sgc)
 
 # Configurable options:
 option(SGC_ENABLE_TESTS "Defines whether to add tests target or not." ON)
+option(SGC_GENERATE_DOCS "Defines whether to generate documentation on build or not." ON)
 
 # Define name of the output directory.
 set(BUILD_DIRECTORY_NAME OUTPUT)

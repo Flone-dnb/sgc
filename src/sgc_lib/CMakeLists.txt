@@ -75,14 +75,16 @@ endif()
 # Enable Clang-tidy.
 enable_clang_tidy(${CMAKE_CURRENT_LIST_DIR}/../../.clang-tidy)
 
-# Enable doxygen.
-enable_doxygen(${CMAKE_CURRENT_SOURCE_DIR}/../../docs)
+if (SGC_GENERATE_DOCS)
+    # Enable doxygen.
+    enable_doxygen(${CMAKE_CURRENT_SOURCE_DIR}/../../docs)
+endif()
 
 # -------------------------------------------------------------------------------------------------
 #                                       DEPENDENCIES
 # -------------------------------------------------------------------------------------------------
 
-if (OFF) # change to `ON` to enable debug logging while debugging
+if (OFF) # change to `ON` to enable debug logging
     message(WARNING "debug logging is enabled")
 
     # External: spdlog.
